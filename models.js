@@ -6,6 +6,13 @@ function dbModel(kninky, tableName, fields) {
   this.indexes = {}
   this.pk = 'id'
   this.justCreatedTables = false
+  // for supporting introspection
+  this._schema = {
+    _schema: this.fields,
+    _model: {
+      _name: tableName
+    }
+  }
 }
 
 dbModel.prototype = {
@@ -32,7 +39,7 @@ function modelType(fieldType) {
   //fieldType needs to be a knex type:
   // http://knexjs.org/#Schema-Building
   this.fieldType = fieldType
-  this.required = false
+  this.isRequired = false
   this.nullable = true
 }
 
@@ -84,12 +91,12 @@ modelType.prototype = {
   //Decorators:
   required: function() {
     //not knex-useful, but let's store it
-    this.required = true
+    this.isRequired = true
     return this
   },
   default: function(defaultVal) {
     this.defaultVal = defaultVal
-    if (defaultVal.timestamp) {
+    if (defaultVal && defaultVal.timestamp) {
       delete this.defaultVal
       this.timestamp = defaultVal
       this.fieldType = 'timestamp'
