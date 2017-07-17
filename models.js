@@ -1,3 +1,5 @@
+//MORETODO: allow var x = new Model(objData); x.save()
+
 function dbModel(kninky, tableName, fields) {
   this.tableName = tableName
   this.kninky = kninky
@@ -31,7 +33,19 @@ dbModel.prototype = {
     }
   },
   get: function(pkVal) {
+    //MORETODO
     return this.kninky.r.table(this.tableName).get(pkVal)
+  },
+  save: function(objData, options) {
+    // MORETODO: returns a promise at the moment
+    // mostly NOT DONE. options only has {conflict: 'update'} possibility
+    if (Array.isArray(objData)) {
+      return this.kninky.k.batchinsert(this.tableName, objData)
+    } else {
+      return this.kninky.k.insert(objData).into(this.tableName)
+    }
+  },
+  update: function(objData) {
   }
 }
 

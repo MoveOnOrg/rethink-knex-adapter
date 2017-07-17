@@ -1,18 +1,20 @@
 var rethinkQuery = require('./query')
 var models = require('./models')
+
 //import rethinkQuery from './query'
 //import {modelType} from './models'
 
 function dumbThinky(knexConfig) {
-    // for 'direct' access to knex
-    this.k = require('knex')(knexConfig)
-
-    // implementation of (some of) thinky/rethinkdb driver interfaces
-    this.r = new rethinkQuery(this)
-    this.type = models.modelType
-
-    // list of models 'created' by createModel()
-    this.models = {}
+  // for 'direct' access to knex
+  this.k = require('knex')(knexConfig)
+  
+  // implementation of (some of) thinky/rethinkdb driver interfaces
+  this.r = new rethinkQuery(this)
+  //this.r = new Term(this)
+  this.type = models.modelType
+  
+  // list of models 'created' by createModel()
+  this.models = {}
 }
 
 dumbThinky.prototype = {
@@ -26,6 +28,7 @@ dumbThinky.prototype = {
       fields[fieldName] = kninkyField
     }
     var model = new models.dbModel(this, tableName, fields)
+    this.models[tableName] = model
 
     this.k.schema.createTableIfNotExists(tableName, function (table) {
       if ('id' in fields && fields['id'].fieldType == 'string') {
@@ -50,6 +53,7 @@ dumbThinky.prototype = {
         // is primary key?
         if (pkDict && pkDict.pk && pkDict.pk == fieldName) {
           kField = kField.primary()
+          model.pk = fieldName
         }
       }
       model.justCreatedTables = true
