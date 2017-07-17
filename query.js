@@ -1,12 +1,7 @@
 var Promise = require('bluebird');
 var Term = require('rethinkdbdash/lib/term.js')
+var ProtoDef = require('rethinkdbdash/lib/protodef.js')
 var Rethink = require('rethinkdbdash')
-
-Term.prototype.XXexpr = function(expression, nestingLevel) {
-  console.log('NEWTERM', expression, nestingLevel, this._query)
-  return this
-}
-
 
 rethinkRowFuncs = {
   new: function(query, rowname) {
@@ -17,33 +12,110 @@ rethinkRowFuncs = {
   }
 }
 
-function rethinkQuery(kninky) {
+var reverseTerms = {}
+var reverseDatum = {}
+var noProcess = {
+  'FUNC': 1,
+  'FUNCALL': 1
+}
+for (var a in ProtoDef.Term.TermType) {
+  reverseTerms[ProtoDef.Term.TermType[a]] = a
+}
+for (var b in ProtoDef.Datum.DatumType) {
+  reverseDatum[ProtoDef.Datum.DatumType[b]] = b
+}
+
+
+function rethinkQuery(kninky, query) {
   this.kninky = kninky
-  var term = function(field) {
-    return term.bracket(field)
-  }
-  //magic so the object is callable
-  term.__proto__ = this.__proto__
+  this.flattened = this.flattenQuery(query)
+  
 }
 
 rethinkQuery.prototype = {
-  bracket: function() {
+  flattenQuery: function(query) {
+    // recursive
+    // Takes the 'machine' json sent to a rethink server and flattens
+    // it 'back' to sql-ish commands.  We do this rather than re-implementing
+    // rethinkdbdash's term.js to avoid crazy object parsing.
+    // Serialized entities are way-easier to process.
+    var flattened = []
+    if (query[0] == 1) {
+      //FUTURE: query[2] will be the db info, if useful/necessary
+      flattened = this.flattenQuery(query[1])
+      flattened.reverse()
+    } else {
+      var cmd = reverseTerms[query[0]] || query[0]
+      var args = [] //args of this command
+      flattened.push([cmd, args]) //args is filled in by-ref below
+      if (query.length > 1) {
+        if (Array.isArray(query[1])) {
+          var firstwrap = query[1];
+          var arg1ind = 1
+          if (Array.isArray(firstwrap) && !noProcess[cmd]) {
+            arg1ind = 2
+            //TODO: this can probably be cleaner, but works
+            for (var i=0,l=firstwrap.length; i<l; i++)  {
+              var secondwrap = firstwrap[i]
+              if (i==0 && Array.isArray(secondwrap)) {
+                var moreCommands = this.flattenQuery(secondwrap)
+                flattened.push.apply(flattened, moreCommands)
+              } else {
+                args.push(secondwrap)
+              }
+            }
+          }
+          args.push.apply(args, query.slice(arg1ind))
+        }
+      }
+    }
+    return flattened
+  },
+  processQuery: function(flattened) {
+    //after this.flattened is set, this will actually run it through knex
+    flattened = flattened || this.flattened
+    for (var i=0,l=flattened.length; i<l; i++) {
+      var f = flattened[i]
+      var cmd = f[0]
+      var args = f[1]
+      if (cmd in this) {
+        this[cmd].apply(this, args)
+      } else {
+        console.log('MISSING IMPLEMENTATION', cmd)
+      }
+    }
+  },
+
+  then: function(func, catchfunc) {
+    console.log('running then()')
+    if (this.knexQuery) {
+      //MORETODO: select() is only if we are selecting/ vs updating/etc
+      return this.knexQuery.then(function(x) {
+        console.log('knex result', x)
+        //func(x)
+      }, catchfunc)
+    } else if (func) {
+      func([])
+    }
+  },
+
+  BRACKET: function() {
     
   },
 
-  changes: function() {
+  CHANGES: function() {
     return this
   },
 
-  count: function() {
+  COUNT: function() {
     return this
   },
 
-  default: function(defaultVal) {
+  DEFAULT: function(defaultVal) {
     return this.resultVal || defaultVal
   },
 
-  delete: function() {
+  DELETE: function() {
     // deletes results of query
     return this
   },
@@ -53,10 +125,11 @@ rethinkQuery.prototype = {
     return this
   },
 
-  filter: function(func_or_dict) {
+  FILTER: function(func_or_dict) {
     // when a dict, it functions like a regular WHERE filter
     // when a function, it needs to filter post-query (sad?)
-    if (typeof func_or_dict == 'function') {
+    if (Array.isArray(func_or_dict)) {
+      //need to process the function as byte-code-ish stuff
       // MORETODO
       //then()
     } else if (func_or_dict) {
@@ -65,16 +138,16 @@ rethinkQuery.prototype = {
     return this
   },
 
-  find: function(func) {
+  FIND: function(func) {
     return this
   },
 
   //forEach(func) {} -- not actually a query -- only on arrays
-  get: function(pk_val) {  // returns single result
+  GET: function(pk_val) {  // returns single result
     return this
   },
 
-  getAll: function() {
+  GET_ALL: function(val, options) {
     //@values can be a single value or an array of values for unique pairs
     //@index_dict will be in the form {index: INDEX_NAME}
     // TODO (not!): not going to implement possibility of multiple vals with complex indices
@@ -105,22 +178,22 @@ rethinkQuery.prototype = {
     return this
   },
 
-  group: function() {
+  GROUP: function() {
     return this
   },
 
-  limit: function() {
+  LIMIT: function() {
     var self = this
     return function(asking_for_index) {
       return self
     }
   },
 
-  orderBy: function(desc_res) {
+  ORDER_BY: function(desc_res) {
     return this
   },
 
-  pluck: function(fieldName) {
+  PLUCK: function(fieldName) {
     /*MORETODO: 
       I think this needs to 
      */
@@ -128,33 +201,15 @@ rethinkQuery.prototype = {
     }
   },
 
-  sum: function() {
+  SUM: function() {
     return this
   },
 
-  table: function(tableName) {
-    var newQuery = new rethinkQuery(this.kninky)
-    newQuery.tableName = tableName
-    newQuery.knexQuery = this.kninky.k.from(tableName)
-    return newQuery
+  TABLE: function(tableName) {
+    this.knexQuery = this.kninky.k.from(tableName)
+    return this.knexQuery
   },
-
-  then: function(func, catchfunc) {
-    console.log('running then()')
-    if (this.knexQuery) {
-      //MORETODO: select() is only if we are selecting/ vs updating/etc
-      return //this.knexQuery.select().then(func, catchfunc)
-      return this.knexQuery.select().then(function(x) {
-        console.log('knex result', x)
-        return []
-      })
-    } else {
-      var p = new Promise().then(func, catchfunc)
-      p.resolve([])
-    }
-  },
-
-  ungroup: function() {
+  UNGROUP: function() {
     return this
   }
 }
@@ -162,6 +217,7 @@ rethinkQuery.prototype = {
 function staticR(kninky) {
   console.log('STATICR', this)
   this.kninky = kninky
+
   return this
   var _r = function(x) {
     return new Term(_r).expr(x)
@@ -175,13 +231,14 @@ function staticR(kninky) {
 
 var _r = Rethink()
 staticR.prototype = {
-  nextVarId: 1,
+  nextVarId: 1, //this is used to index variable references in queries
   xxtable: function(table, options) {
     return new Term(this).table(table, options)
   },
   table: _r.__proto__.table,
 
   getPoolMaster: function() {
+    var self = this
     return {
       getConnection: function() {
         return Promise.resolve({
@@ -189,8 +246,11 @@ staticR.prototype = {
           db: {notnull:true},
           emit: function(){console.log('emit')},
           _send: function(query, token, resolve, reject, originalQuery, options, end) {
+            var r2kQuery = new rethinkQuery(self.kninky, query)
             console.log('SEND', JSON.stringify(query))
-            console.log('SEND orig', JSON.stringify(originalQuery), options, token)
+            console.log('SEND flat', JSON.stringify(r2kQuery.flattened))
+            r2kQuery.processQuery()
+            r2kQuery.then(resolve, reject)
           },
           _isConnection: function() {return true},
           _isOpen: function() {return true}
@@ -206,29 +266,8 @@ staticR.prototype = {
   expr: _r.__proto__.expr,
   not: _r.__proto__.not,
   now: _r.__proto__.now,
-  xxnow: function() {
-    //MORETODO: need to get new createModel or model.js to
-    // use whatever now() the original creates
-    var val = {timestamp: 'now',
-               dt: new Date(),
-               sub: function(secs) {
-                 val.dt = new Date(val.dt - secs * 1000)
-                 return val
-               }
-              }
-    return val
-  },
+  //row is weird
   row: _r.row,
-  //MORETODO: need to get row for createModel or model.js to
-  xxrow: function(rowname) {
-    //r.row('new_val')('is_from_contact'), r.row('old_val').eq(null))
-    var rowfunc = function(col) {
-      rowfunc.col = col
-    }
-    rethinkRowFuncs.new.call(rowfunc, this, rowname)
-    Object.assign(rowfunc, rethinkRowFuncs)
-    return rowfunc
-  }
 }
 //console.log('PROTOTYPE RETHINK', _r.__proto__)
 

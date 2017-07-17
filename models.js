@@ -36,6 +36,9 @@ dbModel.prototype = {
     //MORETODO
     return this.kninky.r.table(this.tableName).get(pkVal)
   },
+  filter: function(data) {
+    return this.kninky.r.table(this.tableName).filter(data)
+  },
   save: function(objData, options) {
     // MORETODO: returns a promise at the moment
     // mostly NOT DONE. options only has {conflict: 'update'} possibility
@@ -110,9 +113,9 @@ modelType.prototype = {
   },
   default: function(defaultVal) {
     this.defaultVal = defaultVal
-    if (defaultVal && defaultVal.timestamp) {
+    if (defaultVal && defaultVal == 'r.now()') {
       delete this.defaultVal
-      this.timestamp = defaultVal
+      this.timestamp = 'now'
       this.fieldType = 'timestamp'
     }
     return this
@@ -139,13 +142,15 @@ modelType.prototype = {
     this.noReference = true
     return this
   },
-  toKnex: function(table, fieldName) {
+  toKnex: function(table, fieldName, knex) {
     var kField = table[this.fieldType](fieldName)
     if (!this.nullable) {
       kField = kField.notNullable()
     }
     if (this.defaultVal) {
       kField = kField.defaultTo(this.defaultVal)
+    } else if (this.timestamp && this.timestamp == 'now') {
+      kField = kField.defaultTo(knex.fn.now())
     }
     return kField
   }

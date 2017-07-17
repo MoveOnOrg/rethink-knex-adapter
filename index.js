@@ -20,7 +20,8 @@ function dumbThinky(knexConfig) {
 dumbThinky.prototype = {
   createModel: function(tableName, schema, pkDict) {
     //pkDict: see zipcode example
-    var fields = {};
+    var self = this
+    var fields = {}
     for (var i=0,l=schema.fields.length; i<l; i++) {
       var fdata = schema.fields[i]
       var fieldName = fdata[0]
@@ -44,7 +45,7 @@ dumbThinky.prototype = {
           continue // addressed above
         }
         var kninkyField = fields[fieldName]
-        var kField = kninkyField.toKnex(table, fieldName)
+        var kField = kninkyField.toKnex(table, fieldName, self.k)
         // is a foreign key?
         if (fieldName.endsWith('_id') && !kninkyField.noReference) {
           var refTable = fieldName.split('_id')[0]
