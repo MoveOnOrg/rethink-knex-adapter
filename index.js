@@ -8,7 +8,7 @@ function dumbThinky(knexConfig) {
     this.k = require('knex')(knexConfig)
 
     // implementation of (some of) thinky/rethinkdb driver interfaces
-    this.r = rethinkQuery(this)
+    this.r = new rethinkQuery(this)
     this.type = models.modelType
 
     // list of models 'created' by createModel()
@@ -30,7 +30,7 @@ dumbThinky.prototype = {
     this.k.schema.createTableIfNotExists(tableName, function (table) {
       if ('id' in fields && fields['id'].fieldType == 'string') {
         table.uuid('id')
-      } else {
+      } else if (!pkDict || !pkDict.pk) {
         table.increments(); //default 'id' field
       }
       if (pkDict && pkDict.timestamps) {
@@ -53,9 +53,13 @@ dumbThinky.prototype = {
         }
       }
       model.justCreatedTables = true
+    }).catch(function(err) {
+      console.error('failed to create ', tableName, err)
     })
     return model
   }
 }
 
-module.exports = dumbThinky
+module.exports = function(knexConfig) {
+  return new dumbThinky(knexConfig);
+}
