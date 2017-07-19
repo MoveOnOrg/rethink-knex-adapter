@@ -1,24 +1,27 @@
 var rethinkQuery = require('./query')
 var models = require('./models')
+
 //import rethinkQuery from './query'
 //import {modelType} from './models'
 
 function dumbThinky(knexConfig) {
-    // for 'direct' access to knex
-    this.k = require('knex')(knexConfig)
-
-    // implementation of (some of) thinky/rethinkdb driver interfaces
-    this.r = new rethinkQuery(this)
-    this.type = models.modelType
-
-    // list of models 'created' by createModel()
-    this.models = {}
+  // for 'direct' access to knex
+  this.k = require('knex')(knexConfig)
+  
+  // implementation of (some of) thinky/rethinkdb driver interfaces
+  this.r = new rethinkQuery(this)
+  //this.r = new Term(this)
+  this.type = models.modelType
+  
+  // list of models 'created' by createModel()
+  this.models = {}
 }
 
 dumbThinky.prototype = {
   createModel: function(tableName, schema, pkDict) {
     //pkDict: see zipcode example
-    var fields = {};
+    var self = this
+    var fields = {}
     for (var i=0,l=schema.fields.length; i<l; i++) {
       var fdata = schema.fields[i]
       var fieldName = fdata[0]
@@ -26,6 +29,7 @@ dumbThinky.prototype = {
       fields[fieldName] = kninkyField
     }
     var model = new models.dbModel(this, tableName, fields)
+    this.models[tableName] = model
 
     this.k.schema.createTableIfNotExists(tableName, function (table) {
       if ('id' in fields && fields['id'].fieldType == 'string') {
@@ -41,7 +45,7 @@ dumbThinky.prototype = {
           continue // addressed above
         }
         var kninkyField = fields[fieldName]
-        var kField = kninkyField.toKnex(table, fieldName)
+        var kField = kninkyField.toKnex(table, fieldName, self.k)
         // is a foreign key?
         if (fieldName.endsWith('_id') && !kninkyField.noReference) {
           var refTable = fieldName.split('_id')[0]
@@ -50,6 +54,7 @@ dumbThinky.prototype = {
         // is primary key?
         if (pkDict && pkDict.pk && pkDict.pk == fieldName) {
           kField = kField.primary()
+          model.pk = fieldName
         }
       }
       model.justCreatedTables = true

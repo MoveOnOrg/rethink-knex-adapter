@@ -1,3 +1,5 @@
+//MORETODO: allow var x = new Model(objData); x.save()
+
 function dbModel(kninky, tableName, fields) {
   this.tableName = tableName
   this.kninky = kninky
@@ -30,8 +32,27 @@ dbModel.prototype = {
       this.kninky.k.table(tableName).index(fields)
     }
   },
+  filter: function(data) {
+    return this.kninky.r.table(this.tableName).filter(data)
+  },
   get: function(pkVal) {
+    //MORETODO
     return this.kninky.r.table(this.tableName).get(pkVal)
+  },
+  getAll: function() {
+    var q = this.kninky.r.table(this.tableName)
+    return q.getAll.apply(q, arguments)
+  },
+  save: function(objData, options) {
+    // MORETODO: returns a promise at the moment
+    // mostly NOT DONE. options only has {conflict: 'update'} possibility
+    if (Array.isArray(objData)) {
+      return this.kninky.k.batchinsert(this.tableName, objData)
+    } else {
+      return this.kninky.k.insert(objData).into(this.tableName)
+    }
+  },
+  update: function(objData) {
   }
 }
 
@@ -96,9 +117,9 @@ modelType.prototype = {
   },
   default: function(defaultVal) {
     this.defaultVal = defaultVal
-    if (defaultVal && defaultVal.timestamp) {
+    if (defaultVal && defaultVal == 'r.now()') {
       delete this.defaultVal
-      this.timestamp = defaultVal
+      this.timestamp = 'now'
       this.fieldType = 'timestamp'
     }
     return this
@@ -125,13 +146,15 @@ modelType.prototype = {
     this.noReference = true
     return this
   },
-  toKnex: function(table, fieldName) {
+  toKnex: function(table, fieldName, knex) {
     var kField = table[this.fieldType](fieldName)
     if (!this.nullable) {
       kField = kField.notNullable()
     }
     if (this.defaultVal) {
       kField = kField.defaultTo(this.defaultVal)
+    } else if (this.timestamp && this.timestamp == 'now') {
+      kField = kField.defaultTo(knex.fn.now())
     }
     return kField
   }
