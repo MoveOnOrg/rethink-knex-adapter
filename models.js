@@ -36,7 +36,6 @@ dbModel.prototype = {
     return this.kninky.r.table(this.tableName).filter(data)
   },
   get: function(pkVal) {
-    //MORETODO
     return this.kninky.r.table(this.tableName).get(pkVal)
   },
   getAll: function() {
@@ -46,10 +45,37 @@ dbModel.prototype = {
   save: function(objData, options) {
     // MORETODO: returns a promise at the moment
     // mostly NOT DONE. options only has {conflict: 'update'} possibility
+    var self = this
     if (Array.isArray(objData)) {
-      return this.kninky.k.batchinsert(this.tableName, objData)
+      console.log('SAVE', objData.length, objData[0], options)
+      return this.kninky.k.batchInsert(this.tableName, objData, 100)
     } else {
+      console.log('SAVE', objData, options)
+      if (this.kninky.defaultsUnsupported) {
+        for (var a in this.fields) {
+          var f = this.fields[a]
+          if (typeof objData[a] == 'undefined'
+              && typeof f.defaultVal != 'undefined') {
+            objData[a] = f.defaultVal
+          }
+        }
+        console.log('SAVE w/defaults', objData)
+      }
+      if (options.conflict == 'update' && objData.id) {
+        //STARTHERE: look for val, if so, then send update
+        //need to turn the insert into a function which waits on result
+        return this.kninky.k.table(this.tableName)
+      }
       return this.kninky.k.insert(objData).into(this.tableName)
+        .then(function(ids) {
+          //TODO: This needs to be a whole (magical) model thingy WITH fields
+          var newData = Object.assign({}, objData)
+          if (self.pk == 'id') {
+            newData.id = ids[0]
+          }
+          console.log('SAVE SUCCESS', newData)
+          return newData
+        })
     }
   },
   update: function(objData) {

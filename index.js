@@ -7,7 +7,8 @@ var models = require('./models')
 function dumbThinky(knexConfig) {
   // for 'direct' access to knex
   this.k = require('knex')(knexConfig)
-  
+  this.defaultsUnsupported = knexConfig.defaultsUnsupported
+
   // implementation of (some of) thinky/rethinkdb driver interfaces
   this.r = new rethinkQuery(this)
   //this.r = new Term(this)
@@ -33,7 +34,7 @@ dumbThinky.prototype = {
 
     this.k.schema.createTableIfNotExists(tableName, function (table) {
       if ('id' in fields && fields['id'].fieldType == 'string') {
-        table.uuid('id')
+        table.uuid('id') // FUTURE: the uuid would need to come client-side for this to work
       } else if (!pkDict || !pkDict.pk) {
         table.increments(); //default 'id' field
       }
