@@ -32,12 +32,16 @@ dbModel.prototype = {
       this.kninky.k.table(tableName).index(fields)
     }
   },
+  filter: function(data) {
+    return this.kninky.r.table(this.tableName).filter(data)
+  },
   get: function(pkVal) {
     //MORETODO
     return this.kninky.r.table(this.tableName).get(pkVal)
   },
-  filter: function(data) {
-    return this.kninky.r.table(this.tableName).filter(data)
+  getAll: function() {
+    var q = this.kninky.r.table(this.tableName)
+    return q.getAll.apply(q, arguments)
   },
   save: function(objData, options) {
     // MORETODO: returns a promise at the moment

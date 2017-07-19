@@ -88,11 +88,14 @@ rethinkQuery.prototype = {
 
   then: function(func, catchfunc) {
     console.log('running then()')
-    if (this.knexQuery) {
+    if (this.isChangesListener) {
+      //TODO: setup a ?local listener for save changes
+    } else if (this.knexQuery) {
       //MORETODO: select() is only if we are selecting/ vs updating/etc
       return this.knexQuery.then(function(x) {
         console.log('knex result', x)
-        //func(x)
+        //need to ?sometimes? turn knex results into model objects
+        func(x)
       }, catchfunc)
     } else if (func) {
       func([])
@@ -104,11 +107,11 @@ rethinkQuery.prototype = {
   },
 
   CHANGES: function() {
-    return this
+    this.isChangesListener = true
   },
 
   COUNT: function() {
-    return this
+
   },
 
   DEFAULT: function(defaultVal) {
@@ -117,12 +120,12 @@ rethinkQuery.prototype = {
 
   DELETE: function() {
     // deletes results of query
-    return this
+
   },
 
   eqJoin: function(tableField, rTableResult, isRightJoin) {
     //when result is 'run' with ('right') it's a right join?!!
-    return this
+
   },
 
   FILTER: function(func_or_dict) {
@@ -135,19 +138,18 @@ rethinkQuery.prototype = {
     } else if (func_or_dict) {
       this.knexQuery = this.knexQuery.where(func_or_dict)
     }
-    return this
   },
 
   FIND: function(func) {
-    return this
+    console.log('FIND')
   },
 
   //forEach(func) {} -- not actually a query -- only on arrays
   GET: function(pk_val) {  // returns single result
-    return this
+
   },
 
-  GET_ALL: function(val, options) {
+  GET_ALL: function() {
     //@values can be a single value or an array of values for unique pairs
     //@index_dict will be in the form {index: INDEX_NAME}
     // TODO (not!): not going to implement possibility of multiple vals with complex indices
@@ -157,7 +159,7 @@ rethinkQuery.prototype = {
     var notValArgs = (lastArg.index ? 1 : 0)
     // all but the last arg, if it's the index thingie:
     var valArgs = Array.prototype.slice.call(arguments, 0, arguments.length - notValArgs);
-    console.log(lastArg)
+    console.log('valargs', valArgs)
     if (lastArg.index
         && lastArg.index != index
         && lastArg.index in model.indexes) {
@@ -175,11 +177,11 @@ rethinkQuery.prototype = {
       console.log('queryDict', queryDict)
       this.knexQuery = this.knexQuery.where(queryDict)
     }
-    return this
+
   },
 
   GROUP: function() {
-    return this
+
   },
 
   LIMIT: function() {
@@ -190,7 +192,7 @@ rethinkQuery.prototype = {
   },
 
   ORDER_BY: function(desc_res) {
-    return this
+
   },
 
   PLUCK: function(fieldName) {
@@ -202,15 +204,16 @@ rethinkQuery.prototype = {
   },
 
   SUM: function() {
-    return this
+
   },
 
   TABLE: function(tableName) {
+    this.tableName = tableName
     this.knexQuery = this.kninky.k.from(tableName)
     return this.knexQuery
   },
   UNGROUP: function() {
-    return this
+
   }
 }
 
@@ -231,7 +234,7 @@ function staticR(kninky) {
 
 var _r = Rethink()
 staticR.prototype = {
-  nextVarId: 1, //this is used to index variable references in queries
+  nextVarId: 0, //this is used to index variable references in queries
   xxtable: function(table, options) {
     return new Term(this).table(table, options)
   },
