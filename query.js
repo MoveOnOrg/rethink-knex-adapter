@@ -100,16 +100,47 @@ rethinkQuery.prototype = {
     console.log('running then()')
     if (this.isChangesListener) {
       //TODO: setup a ?local listener for save changes
+      console.log('UNIMPLEMENTED: CHANGES LISTENER')
     } else if (this.knexQuery) {
       console.log('KNEX QUERY', this.knexQuery._method)
+      if (self.currentJoin && !self.currentJoin.select) {
+        // we need to structure the output as {'left': {...}, 'right': {....}}
+        // so we need to make the fields distinguishable to separate them later
+        var columns = []
+        var lTable = self.currentJoin.left
+        var rTable = self.currentJoin.right
+        var lModel = this.kninky.models[lTable]
+        var rModel = this.kninky.models[rTable]
+        for (var lField in lModel.fields) {
+          columns.push(lTable + '.' + lField + ' as left_' +lField)
+        }
+        for (var rField in rModel.fields) {
+          columns.push(rTable + '.' + rField + ' as right_' +rField)
+        }
+        this.knexQuery = this.knexQuery.select(columns)
+      }
+
       return this.knexQuery.then(function(x) {
+        //TODO: need to ?sometimes? turn knex results into model objects
         console.log('knex result b', self.brackets)
         console.log('knex result', x)
-        //need to ?sometimes? turn knex results into model objects
+        if (self.currentJoin && !self.currentJoin.select) {
+          x = x.map(function(res) {
+            var newObj = {'left':{}, 'right': {}}
+            for (var k in res) {
+              if (k.startsWith('left_')) {
+                newObj.left[k.slice(5)] = res[k]
+              } else if (k.startsWith('right_')) {
+                newObj.right[k.slice(6)] = res[k]
+              } else {
+                newObj[k] = res[k]
+              }
+            }
+          })
+        }
         if (self.brackets.length) {
-          //MORETODO: brackets need to be laced with the right parts
+          //MORETODO?: brackets need to be laced with the right parts
           // and then maybe iterated through
-          // also handle 'right'
           x = x[self.brackets.pop()]
         }
         if (!x && self.defaultVal) {
@@ -125,7 +156,16 @@ rethinkQuery.prototype = {
   BRACKET: function(index) {
     // see then: implementation for how we 'catch' this
     if (this.currentJoin && (index == 'right' || index == 'left')) {
+      // we need to restrict the results to just the columns from
+      // one of the join sides
       this.currentJoin['select'] = index
+      var columns = []
+      var selectTable = this.currentJoin[index]
+      var selectModel = this.kninky.models[selectTable]
+      for (var sField in selectModel.fields) {
+        columns.push(selectTable + '.' + sField)
+      }
+      this.knexQuery = this.knexQuery.select(columns)
     } else if (this.currentPluck == index) {
       // do nothing: this is knex's default behavior:
       //  pluck('foo') => ['foo_value1', 'foo_value2'...]
