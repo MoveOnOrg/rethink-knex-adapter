@@ -51,31 +51,55 @@ dbModel.prototype = {
       return this.kninky.k.batchInsert(this.tableName, objData, 100)
     } else {
       console.log('SAVE', objData, options)
-      if (this.kninky.defaultsUnsupported) {
-        for (var a in this.fields) {
-          var f = this.fields[a]
-          if (typeof objData[a] == 'undefined'
-              && typeof f.defaultVal != 'undefined') {
-            objData[a] = f.defaultVal
+      var insertFunc = function() {
+        // only set defaults on insert -- not on update
+        if (self.kninky.defaultsUnsupported) {
+          for (var a in self.fields) {
+            var f = self.fields[a]
+            if (typeof objData[a] == 'undefined'
+                && typeof f.defaultVal != 'undefined') {
+              objData[a] = f.defaultVal
+            }
           }
+          console.log('SAVE w/defaults', objData)
         }
-        console.log('SAVE w/defaults', objData)
+        return self.kninky.k.insert(objData).into(self.tableName)
+          .then(function(ids) {
+            //TODO: This needs to be a whole (magical) model thingy WITH fields
+            var newData = Object.assign({}, objData)
+            if (self.pk == 'id') {
+              newData.id = ids[0]
+            }
+            console.log('SAVE SUCCESS', newData)
+            return newData
+          })
       }
-      if (options.conflict == 'update' && objData.id) {
+
+      if (options && options.conflict == 'update') {
         //STARTHERE: look for val, if so, then send update
         //need to turn the insert into a function which waits on result
-        return this.kninky.k.table(this.tableName)
+        var q = {}
+        if (objData[this.pk]) {
+          q[this.pk] = objData[this.pk]
+        } else {
+          Object.assign(q, objData)
+        }
+        return this.kninky.k.table(this.tableName).where(q)
+          .select().then(function(count) {
+            if (count.length) {
+              return self.kninky.k.table(self.tableName).where(q)
+                .update(objData, self.pk).then(function(res) {
+                  var newData = Object.assign({}, count[0], objData)
+                  console.log('SAVE UPDATE', newData)
+                  return newData
+                })
+            } else {
+              return insertFunc()
+            }
+          })
+      } else {
+        return insertFunc()
       }
-      return this.kninky.k.insert(objData).into(this.tableName)
-        .then(function(ids) {
-          //TODO: This needs to be a whole (magical) model thingy WITH fields
-          var newData = Object.assign({}, objData)
-          if (self.pk == 'id') {
-            newData.id = ids[0]
-          }
-          console.log('SAVE SUCCESS', newData)
-          return newData
-        })
     }
   },
   update: function(objData) {
