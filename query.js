@@ -111,7 +111,11 @@ rethinkQuery.prototype = {
   },
 
   COUNT: function() {
-
+    if (this.knexQuery) {
+      this.knexQuery = this.knexQuery.count().then(function(countResult) {
+        return Number(countResult[0]['count(*)'])
+      })
+    }
   },
 
   DEFAULT: function(defaultVal) {
@@ -184,10 +188,9 @@ rethinkQuery.prototype = {
 
   },
 
-  LIMIT: function() {
-    var self = this
-    return function(asking_for_index) {
-      return self
+  LIMIT: function(max) {
+    if (this.knexQuery) {
+      this.knexQuery = this.knexQuery.limit(max)
     }
   },
 
