@@ -2,6 +2,7 @@ var Promise = require('bluebird');
 var Term = require('rethinkdbdash/lib/term.js')
 var ProtoDef = require('rethinkdbdash/lib/protodef.js')
 var Rethink = require('rethinkdbdash')
+var Document = require('./models').Document
 
 rethinkRowFuncs = {
   new: function(query, rowname) {
@@ -145,6 +146,13 @@ rethinkQuery.prototype = {
         }
         if (!x && self.defaultVal) {
           x = self.defaultVal
+        }
+        if (Array.isArray(x)) {
+          var model = self.kninky.models[self.tableName]
+          x = x.map(function(res) {
+            res.__proto__ = new Document(model, model._options)
+            return res
+          })
         }
         func(x)
       }, catchfunc)

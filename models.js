@@ -6,7 +6,7 @@ function Document(model, options) {
 
 Document.prototype.save = function(callback) {
   //saving an actual document that has possibly been modified
-  var res = this._model.save(this)
+  var res = this._model.save(this, {conflict: 'update'})
   return (callback ? res.then(callback) : res.then())
 }
 
@@ -239,5 +239,6 @@ Object.assign(modelType, modelType.prototype)
 
 module.exports = {
   modelType,
-  dbModel
+  dbModel,
+  Document
 }
