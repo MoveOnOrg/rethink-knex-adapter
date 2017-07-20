@@ -205,7 +205,7 @@ rethinkQuery.prototype = {
     }
   },
 
-  EQ_JOIN: function(tableField, rTableResult) {
+  EQ_JOIN: function(leftTableField, rTableResult, rightTableIndex) {
     //when result is 'run' with ('right') it's a right join?!!
     /*
       still todo:
@@ -228,11 +228,14 @@ rethinkQuery.prototype = {
       'right': rightTableName
     }
     var rightModel = this.kninky.models[rightTableName]
+    var rightTableField = ((rightTableIndex && rightTableIndex.index)
+                           ? rightTableIndex.index
+                           : rightModel.pk)
     console.log('right model', rTableResult)
     this.knexQuery = this.knexQuery.join(
       rightTableName,
-      this.tableName + '.' + tableField,
-      rightTableName + '.' + rightModel.pk
+      this.tableName + '.' + leftTableField,
+      rightTableName + '.' + rightTableField
     )
   },
 
@@ -253,7 +256,7 @@ rethinkQuery.prototype = {
   },
 
   GET: function(pk_val) {  // returns single result
-    console.log('UNIMPLEMENTED GET')
+    this.knexQuery = this.knexQuery.where(this.pk, pk_val)
   },
 
   GET_ALL: function() {
@@ -294,13 +297,19 @@ rethinkQuery.prototype = {
   },
 
   GROUP: function() {
-
+    //TODO
+    console.error('UNIMPLEMENTED GROUP')
   },
 
   LIMIT: function(max) {
     if (this.knexQuery) {
       this.knexQuery = this.knexQuery.limit(max)
     }
+  },
+
+  MERGE: function(func) {
+    //TODO
+    console.error('UNIMPLEMENTED MERGE ')
   },
 
   ORDER_BY: function(desc_res) {
@@ -337,8 +346,13 @@ rethinkQuery.prototype = {
     this.knexQuery = this.kninky.k.from(tableName)
     return this.knexQuery
   },
+
   UNGROUP: function() {
 
+  },
+
+  UPDATE: function(updateData) {
+    this.knexQuery = this.knexQuery.update(updateData)
   }
 }
 

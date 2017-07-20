@@ -1,6 +1,17 @@
 //MORETODO: allow var x = new Model(objData); x.save()
 
-function dbModel(kninky, tableName, fields) {
+function Document(model, options) {
+  this._model = model.__proto__
+}
+
+Document.prototype.save = function(callback) {
+  //saving an actual document that has possibly been modified
+  var res = this._model.save(this)
+  return (callback ? res.then(callback) : res.then())
+}
+
+
+function dbModel(tableName, fields, options, kninky) {
   this.tableName = tableName
   this.kninky = kninky
 
@@ -15,6 +26,18 @@ function dbModel(kninky, tableName, fields) {
       _name: tableName
     }
   }
+  // probably useless
+  this._options = options || {}
+}
+
+dbModel.new = function(name, fields, options, kninky) {
+  var proto = new dbModel(name, fields, options, kninky)
+  var model = function model(doc, options) {
+    doc.__proto__ = new Document(model, options)
+    return doc
+  }
+  model.__proto__ = proto
+  return model
 }
 
 dbModel.prototype = {
@@ -71,6 +94,7 @@ dbModel.prototype = {
               newData.id = ids[0]
             }
             console.log('SAVE SUCCESS', newData)
+            newData.__proto__ = new Document(self, self._options)
             return newData
           })
       }
@@ -91,6 +115,7 @@ dbModel.prototype = {
                 .update(objData, self.pk).then(function(res) {
                   var newData = Object.assign({}, count[0], objData)
                   console.log('SAVE UPDATE', newData)
+                  newData.__proto__ = new Document(self, self._options)
                   return newData
                 })
             } else {

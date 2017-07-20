@@ -29,7 +29,7 @@ dumbThinky.prototype = {
       var kninkyField = fdata[1]
       fields[fieldName] = kninkyField
     }
-    var model = new models.dbModel(this, tableName, fields)
+    var model = models.dbModel.new(tableName, fields, {}, this)
     this.models[tableName] = model
 
     this.k.schema.createTableIfNotExists(tableName, function (table) {
