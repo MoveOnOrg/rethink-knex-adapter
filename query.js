@@ -124,7 +124,17 @@ rethinkQuery.prototype = {
 
   BRACKET: function(index) {
     // see then: implementation for how we 'catch' this
-    this.brackets.push(index)
+    if (this.currentJoin && (index == 'right' || index == 'left')) {
+      this.currentJoin['select'] = index
+    } else if (this.currentPluck == index) {
+      // do nothing: this is knex's default behavior:
+      //  pluck('foo') => ['foo_value1', 'foo_value2'...]
+      // whereas rethinkdb defaults to
+      //  pluck('foo') => [{'foo': 'foo_value1'}, {'foo': foo_value2'},...]
+      // but r.pluck('foo')('foo') is so common, we'll just ASSUME it
+    } else {
+      this.brackets.push(index)
+    }
   },
 
   CHANGES: function() {
@@ -157,13 +167,25 @@ rethinkQuery.prototype = {
 
   EQ_JOIN: function(tableField, rTableResult) {
     //when result is 'run' with ('right') it's a right join?!!
-    console.log('UNIMPLEMENTED eq_join')
+    /*
+      still todo:
+      - output rows as 'left': ... and 'right'...
+      - .. except when a BRACKET('right'/'left') is sent
+        and then only select those
+      - support filter((row) => (
+           row('right').... (or left) for mapping
+     */
     var rightTableName
     if (Array.isArray(rTableResult) && rTableResult[0] == 15) {
       // example: [ 15, [ 'organization' ] ]
       rightTableName = rTableResult[1][0]
     } else {
       console.error("right join table of unknown type", rTableResult)
+      throw new Error('right join table of unknown type')
+    }
+    this.currentJoin = {
+      'left': this.tableName,
+      'right': rightTableName
     }
     var rightModel = this.kninky.models[rightTableName]
     console.log('right model', rTableResult)
@@ -263,6 +285,7 @@ rethinkQuery.prototype = {
     if (this.knexQuery) {
       this.knexQuery = this.knexQuery.pluck(fieldName)
     }
+    this.currentPluck = fieldName // for bracket, it's redundant
   },
 
   SUM: function() {
