@@ -29,6 +29,7 @@ for (var b in ProtoDef.Datum.DatumType) {
 function rethinkQuery(kninky, query) {
   this.kninky = kninky
   this.flattened = this.flattenQuery(query)
+  this.brackets = []
   
 }
 
@@ -61,7 +62,15 @@ rethinkQuery.prototype = {
                 var moreCommands = this.flattenQuery(secondwrap)
                 flattened.push.apply(flattened, moreCommands)
               } else {
-                args.push(secondwrap)
+                if (Array.isArray(secondwrap)
+                    && secondwrap.length == 2
+                    && secondwrap[0] == 2) {
+                  //MAKE_ARRAY has code 2,
+                  // so this is how we have an array as an argument
+                  args.push(secondwrap[1])
+                } else { //normal
+                  args.push(secondwrap)
+                }
               }
             }
           }
@@ -87,14 +96,25 @@ rethinkQuery.prototype = {
   },
 
   then: function(func, catchfunc) {
+    var self = this
     console.log('running then()')
     if (this.isChangesListener) {
       //TODO: setup a ?local listener for save changes
     } else if (this.knexQuery) {
-      //MORETODO: select() is only if we are selecting/ vs updating/etc
+      console.log('KNEX QUERY', this.knexQuery._method)
       return this.knexQuery.then(function(x) {
+        console.log('knex result b', self.brackets)
         console.log('knex result', x)
         //need to ?sometimes? turn knex results into model objects
+        if (self.brackets.length) {
+          //MORETODO: brackets need to be laced with the right parts
+          // and then maybe iterated through
+          // also handle 'right'
+          x = x[self.brackets.pop()]
+        }
+        if (!x && self.defaultVal) {
+          x = self.defaultVal
+        }
         func(x)
       }, catchfunc)
     } else if (func) {
@@ -102,8 +122,9 @@ rethinkQuery.prototype = {
     }
   },
 
-  BRACKET: function() {
-    
+  BRACKET: function(index) {
+    // see then: implementation for how we 'catch' this
+    this.brackets.push(index)
   },
 
   CHANGES: function() {
@@ -119,17 +140,38 @@ rethinkQuery.prototype = {
   },
 
   DEFAULT: function(defaultVal) {
-    return this.resultVal || defaultVal
+    this.defaultVal = defaultVal
   },
 
   DELETE: function() {
-    // deletes results of query
-
+    if (this.knexQuery) {
+      this.knexQuery = this.knexQuery.delete()
+    }
   },
 
-  eqJoin: function(tableField, rTableResult, isRightJoin) {
-    //when result is 'run' with ('right') it's a right join?!!
+  DISTINCT: function() {
+    if (this.knexQuery) {
+      this.knexQuery = this.knexQuery.distinct()
+    }
+  },
 
+  EQ_JOIN: function(tableField, rTableResult) {
+    //when result is 'run' with ('right') it's a right join?!!
+    console.log('UNIMPLEMENTED eq_join')
+    var rightTableName
+    if (Array.isArray(rTableResult) && rTableResult[0] == 15) {
+      // example: [ 15, [ 'organization' ] ]
+      rightTableName = rTableResult[1][0]
+    } else {
+      console.error("right join table of unknown type", rTableResult)
+    }
+    var rightModel = this.kninky.models[rightTableName]
+    console.log('right model', rTableResult)
+    this.knexQuery = this.knexQuery.join(
+      rightTableName,
+      this.tableName + '.' + tableField,
+      rightTableName + '.' + rightModel.pk
+    )
   },
 
   FILTER: function(func_or_dict) {
@@ -145,12 +187,11 @@ rethinkQuery.prototype = {
   },
 
   FIND: function(func) {
-    console.log('FIND')
+    console.log('UNIMPLEMENTED FIND')
   },
 
-  //forEach(func) {} -- not actually a query -- only on arrays
   GET: function(pk_val) {  // returns single result
-
+    console.log('UNIMPLEMENTED GET')
   },
 
   GET_ALL: function() {
@@ -163,11 +204,12 @@ rethinkQuery.prototype = {
     var notValArgs = (lastArg.index ? 1 : 0)
     // all but the last arg, if it's the index thingie:
     var valArgs = Array.prototype.slice.call(arguments, 0, arguments.length - notValArgs);
-    console.log('valargs', valArgs)
+    console.log('valargs', valArgs, lastArg)
     if (lastArg.index
-        && lastArg.index != index
-        && lastArg.index in model.indexes) {
-          index = model.indexes[lastArg.index]
+        && lastArg.index != model.pk
+        && lastArg.index in model.indexes
+       ) {
+      index = model.indexes[lastArg.index]
     }
 
     if (valArgs.length > 1) {
@@ -176,7 +218,12 @@ rethinkQuery.prototype = {
     } else if (valArgs.length > 0) {
       var queryDict = {}
       index.forEach(function(ind, i) {
-        queryDict[ind] = valArgs[i]
+        if (Array.isArray(valArgs[0])) {
+          //for multi-field indexes
+          queryDict[ind] = valArgs[0][i]
+        } else {
+          queryDict[ind] = valArgs[i]
+        }
       })
       console.log('queryDict', queryDict)
       this.knexQuery = this.knexQuery.where(queryDict)
@@ -195,14 +242,26 @@ rethinkQuery.prototype = {
   },
 
   ORDER_BY: function(desc_res) {
-
+    if (this.knexQuery) {
+      var direction = 'asc'
+      var key = desc_res
+      if (Array.isArray(desc_res) && Array.isArray(desc_res[1])) {
+        // this looks something like: [74,["due_by"]]
+        // 74 is desc, 73 is asc
+        key = desc_res[1][0]
+        direction = reverseTerms[desc_res[0]].toLowerCase()
+      } else if (typeof desc_res == 'function') {
+        //FUTURE: dumb feature, let's not implement
+        return
+      }
+      console.log('orderBy', key, direction)
+      this.knexQuery = this.knexQuery.orderBy(key, direction)
+    }
   },
 
   PLUCK: function(fieldName) {
-    /*MORETODO: 
-      I think this needs to 
-     */
-    return function(return_column) {
+    if (this.knexQuery) {
+      this.knexQuery = this.knexQuery.pluck(fieldName)
     }
   },
 
