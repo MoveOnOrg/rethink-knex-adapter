@@ -150,7 +150,7 @@ rethinkQuery.prototype = {
         if (Array.isArray(x)) {
           var model = self.kninky.models[self.tableName]
           x = x.map(function(res) {
-            res.__proto__ = new Document(model, model._options)
+            res.__proto__ = new Document(model, model._options, true)
             return res
           })
         }

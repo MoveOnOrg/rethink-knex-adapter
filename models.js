@@ -1,12 +1,17 @@
 //MORETODO: allow var x = new Model(objData); x.save()
 
-function Document(model, options) {
+function Document(model, options, exists) {
   this._model = model.__proto__
+  this._exists = exists || false
 }
 
 Document.prototype.save = function(callback) {
   //saving an actual document that has possibly been modified
-  var res = this._model.save(this, {conflict: 'update'})
+  var options = {}
+  if (this._exists || this[this._model.pk]) {
+    options['conflict'] = 'update'
+  }
+  var res = this._model.save(this, options)
   return (callback ? res.then(callback) : res.then())
 }
 
@@ -94,7 +99,7 @@ dbModel.prototype = {
               newData.id = ids[0]
             }
             console.log('SAVE SUCCESS', newData)
-            newData.__proto__ = new Document(self, self._options)
+            newData.__proto__ = new Document(self, self._options, true)
             return newData
           })
       }
@@ -115,7 +120,7 @@ dbModel.prototype = {
                 .update(objData, self.pk).then(function(res) {
                   var newData = Object.assign({}, count[0], objData)
                   console.log('SAVE UPDATE', newData)
-                  newData.__proto__ = new Document(self, self._options)
+                  newData.__proto__ = new Document(self, self._options, true)
                   return newData
                 })
             } else {
