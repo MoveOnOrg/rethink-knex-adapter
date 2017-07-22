@@ -15,12 +15,12 @@ Document.prototype.save = function(callback) {
   return (callback ? res.then(callback) : res.then())
 }
 
-
 function dbModel(tableName, fields, options, kninky) {
   this.tableName = tableName
   this.kninky = kninky
 
   this.fields = fields || {}
+  this.dateFields = []
   this.indexes = {}
   this.pk = 'id'
   this.justCreatedTables = false
@@ -116,13 +116,7 @@ dbModel.prototype = {
         return this.kninky.k.table(this.tableName).where(q)
           .select().then(function(count) {
             if (count.length) {
-              return self.kninky.k.table(self.tableName).where(q)
-                .update(objData, self.pk).then(function(res) {
-                  var newData = Object.assign({}, count[0], objData)
-                  console.log('SAVE UPDATE', newData)
-                  newData.__proto__ = new Document(self, self._options, true)
-                  return newData
-                })
+              return self.update(objData, q)
             } else {
               return insertFunc()
             }
@@ -132,7 +126,35 @@ dbModel.prototype = {
       }
     }
   },
-  update: function(objData) {
+  update: function(objData, q) {
+    var self = this
+    if (!q) {
+      var pkVal = objData[this.pk]
+      if (pkVal) {
+        q = {}
+        q[this.pk] = objData[this.pk]
+      } else {
+        throw new Error("cannot update unsaved value")
+      }
+    }
+    return this.kninky.k.table(this.tableName).where(q)
+      .update(objData, this.pk).then(function(res) {
+        var newData = Object.assign({}, count[0], objData)
+        console.log('SAVE UPDATE', newData)
+        newData.__proto__ = new Document(self, self._options, true)
+        return newData
+      })
+  },
+  _updateDateFields: function(objData) {
+    // converts date field numbers/strings into date objects
+    // which is how (some) databases (cough *sqlite*) return the data
+    for (var i=0,l=this.dateFields.length; i<l; i++) {
+      var f = this.dateFields[i]
+      if (objData[f] && !(objData[f] instanceof Date)) {
+        objData[f] = new Date(objData[f])
+      }
+    }
+    return objData
   }
 }
 
@@ -181,7 +203,10 @@ modelType.prototype = {
     return new modelType('integer')
   },
   date: function() {
-    return new modelType('date')
+    // rethink really means a datetime stamp
+    var dt = new modelType('dateTime')
+    dt.isDate = true
+    return dt
   },
   point: function() {
     //GEO :-(

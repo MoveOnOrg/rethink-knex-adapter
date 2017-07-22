@@ -47,6 +47,9 @@ dumbThinky.prototype = {
         }
         var kninkyField = fields[fieldName]
         var kField = kninkyField.toKnex(table, fieldName, self.k)
+        if (kninkyField.isDate) {
+          model.dateFields.push(fieldName)
+        }
         // is a foreign key?
         if (fieldName.endsWith('_id') && !kninkyField.noReference) {
           var refTable = fieldName.split('_id')[0]
