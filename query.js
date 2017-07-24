@@ -2,6 +2,7 @@ var Promise = require('bluebird');
 var Term = require('rethinkdbdash/lib/term.js')
 var ProtoDef = require('rethinkdbdash/lib/protodef.js')
 var Rethink = require('rethinkdbdash')
+var Document = require('./models').Document
 
 rethinkRowFuncs = {
   new: function(query, rowname) {
@@ -34,7 +35,7 @@ function rethinkQuery(kninky, query) {
 }
 
 rethinkQuery.prototype = {
-  flattenQuery: function(query) {
+  flattenQuery: function(query, processSubs) {
     // recursive
     // Takes the 'machine' json sent to a rethink server and flattens
     // it 'back' to sql-ish commands.  We do this rather than re-implementing
@@ -53,25 +54,27 @@ rethinkQuery.prototype = {
         if (Array.isArray(query[1])) {
           var firstwrap = query[1];
           var arg1ind = 1
-          if (Array.isArray(firstwrap) && !noProcess[cmd]) {
-            arg1ind = 2
-            //TODO: this can probably be cleaner, but works
-            for (var i=0,l=firstwrap.length; i<l; i++)  {
-              var secondwrap = firstwrap[i]
-              if (i==0 && Array.isArray(secondwrap)) {
-                var moreCommands = this.flattenQuery(secondwrap)
-                flattened.push.apply(flattened, moreCommands)
-              } else {
+          if (Array.isArray(firstwrap)) {
+              arg1ind = 2
+              //TODO: this can probably be cleaner, but works
+              for (var i=0,l=firstwrap.length; i<l; i++)  {
+                var secondwrap = firstwrap[i]
                 if (Array.isArray(secondwrap)
                     && secondwrap.length == 2
                     && secondwrap[0] == 2) {
                   //MAKE_ARRAY has code 2,
                   // so this is how we have an array as an argument
                   args.push(secondwrap[1])
-                } else { //normal
+                } else if (i==0 && Array.isArray(secondwrap) && !noProcess[cmd]) {
+                  var moreCommands = this.flattenQuery(secondwrap)
+                  flattened.push.apply(flattened, moreCommands)
+                } else if (noProcess[cmd]) {
+                  if (processSubs) {
+                    args.push(this.flattenQuery(secondwrap, true))
+                  }
+                } else {
                   args.push(secondwrap)
                 }
-              }
             }
           }
           args.push.apply(args, query.slice(arg1ind))
@@ -97,6 +100,8 @@ rethinkQuery.prototype = {
 
   then: function(func, catchfunc) {
     var self = this
+    var model = this.kninky.models[this.tableName]
+
     console.log('running then()')
     if (this.isChangesListener) {
       //TODO: setup a ?local listener for save changes
@@ -145,6 +150,21 @@ rethinkQuery.prototype = {
         }
         if (!x && self.defaultVal) {
           x = self.defaultVal
+        }
+        if (Array.isArray(x)) {
+          x = x.map(function(res) {
+            res.__proto__ = new Document(model, model._options, true)
+            return model._updateDateFields(res)
+          })
+        }
+        if (x && self.pkVal && self.knexQuery._method == 'update') {
+          // needs to do a new select to get all the data back
+          return self.kninky.k.from(self.tableName)
+            .where(model.pk, self.pkVal).then(function(data){
+              console.log('UPDATED RECORD', data)
+              var newData = model._updateDateFields(data[0])
+              return newData
+            }).then(func, catchfunc)
         }
         func(x)
       }, catchfunc)
@@ -205,7 +225,7 @@ rethinkQuery.prototype = {
     }
   },
 
-  EQ_JOIN: function(tableField, rTableResult) {
+  EQ_JOIN: function(leftTableField, rTableResult, rightTableIndex) {
     //when result is 'run' with ('right') it's a right join?!!
     /*
       still todo:
@@ -228,11 +248,14 @@ rethinkQuery.prototype = {
       'right': rightTableName
     }
     var rightModel = this.kninky.models[rightTableName]
+    var rightTableField = ((rightTableIndex && rightTableIndex.index)
+                           ? rightTableIndex.index
+                           : rightModel.pk)
     console.log('right model', rTableResult)
     this.knexQuery = this.knexQuery.join(
       rightTableName,
-      this.tableName + '.' + tableField,
-      rightTableName + '.' + rightModel.pk
+      this.tableName + '.' + leftTableField,
+      rightTableName + '.' + rightTableField
     )
   },
 
@@ -241,6 +264,8 @@ rethinkQuery.prototype = {
     // when a function, it needs to filter post-query (sad?)
     if (Array.isArray(func_or_dict)) {
       //need to process the function as byte-code-ish stuff
+      var funccode = this.flattenQuery(func_or_dict, true)
+      console.log('FUNCCODE', JSON.stringify(funccode))
       // MORETODO
       //then()
     } else if (func_or_dict) {
@@ -253,7 +278,9 @@ rethinkQuery.prototype = {
   },
 
   GET: function(pk_val) {  // returns single result
-    console.log('UNIMPLEMENTED GET')
+    var model = this.kninky.models[this.tableName]
+    this.pkVal = pk_val
+    this.knexQuery = this.knexQuery.where(model.pk, pk_val)
   },
 
   GET_ALL: function() {
@@ -266,7 +293,6 @@ rethinkQuery.prototype = {
     var notValArgs = (lastArg.index ? 1 : 0)
     // all but the last arg, if it's the index thingie:
     var valArgs = Array.prototype.slice.call(arguments, 0, arguments.length - notValArgs);
-    console.log('valargs', valArgs, lastArg)
     if (lastArg.index
         && lastArg.index != model.pk
         && lastArg.index in model.indexes
@@ -288,19 +314,28 @@ rethinkQuery.prototype = {
         }
       })
       console.log('queryDict', queryDict)
+      if (model.pk in queryDict) {
+        this.pkVal = queryDict[model.pk]
+      }
       this.knexQuery = this.knexQuery.where(queryDict)
     }
 
   },
 
   GROUP: function() {
-
+    //TODO
+    console.error('UNIMPLEMENTED GROUP')
   },
 
   LIMIT: function(max) {
     if (this.knexQuery) {
       this.knexQuery = this.knexQuery.limit(max)
     }
+  },
+
+  MERGE: function(func) {
+    //TODO
+    console.error('UNIMPLEMENTED MERGE ')
   },
 
   ORDER_BY: function(desc_res) {
@@ -337,8 +372,25 @@ rethinkQuery.prototype = {
     this.knexQuery = this.kninky.k.from(tableName)
     return this.knexQuery
   },
+
   UNGROUP: function() {
 
+  },
+
+  UPDATE: function(updateData) {
+    var copyData = Object.assign({}, updateData)
+    console.log('update init data', copyData)
+    for (var f in copyData) {
+      var v = copyData[f]
+      if (Array.isArray(v)) { //MORE RETHINK QUERY CODES
+        var model = this.kninky.models[this.tableName]
+        if (v[0] == 99) { //ISO8601 DATE
+          copyData[f] = new Date(v[1][0])
+        }
+      }
+    }
+    console.log('UPDATING', copyData)
+    this.knexQuery = this.knexQuery.update(copyData)
   }
 }
 

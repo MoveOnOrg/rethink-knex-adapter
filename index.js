@@ -29,7 +29,7 @@ dumbThinky.prototype = {
       var kninkyField = fdata[1]
       fields[fieldName] = kninkyField
     }
-    var model = new models.dbModel(this, tableName, fields)
+    var model = models.dbModel.new(tableName, fields, {}, this)
     this.models[tableName] = model
 
     this.k.schema.createTableIfNotExists(tableName, function (table) {
@@ -47,6 +47,9 @@ dumbThinky.prototype = {
         }
         var kninkyField = fields[fieldName]
         var kField = kninkyField.toKnex(table, fieldName, self.k)
+        if (kninkyField.isDate) {
+          model.dateFields.push(fieldName)
+        }
         // is a foreign key?
         if (fieldName.endsWith('_id') && !kninkyField.noReference) {
           var refTable = fieldName.split('_id')[0]
