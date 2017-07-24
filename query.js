@@ -164,6 +164,7 @@ rethinkQuery.prototype = {
                 .where(model.pk, self.pkVal).then(function(data){
                   console.log('UPDATED RECORD', data)
                   var newData = model._updateDateFields(data[0])
+                  newData.replaced = x // count (i think)
                   return newData
                 }).then(func, catchfunc)
             } else if (self.returnSingleObject && x.length) {
@@ -328,7 +329,7 @@ rethinkQuery.prototype = {
     console.error('UNIMPLEMENTED GROUP')
   },
 
-  INNER_JOIN: function(table_obj, func_code) {
+  INNER_JOIN: function(table_obj, funcCode) {
     console.error('UNIMPLEMENTED INNER_JOIN')
   },
 
@@ -338,9 +339,10 @@ rethinkQuery.prototype = {
     }
   },
 
-  MERGE: function(func) {
+  MERGE: function(funcCode) {
     //TODO
-    console.error('UNIMPLEMENTED MERGE ')
+    var funcFlat = this.flattenQuery(funcCode, true)
+    console.error('UNIMPLEMENTED MERGE ', JSON.stringify(funcFlat))
   },
 
   ORDER_BY: function(desc_res) {
@@ -379,16 +381,17 @@ rethinkQuery.prototype = {
   },
 
   UNGROUP: function() {
-
+    console.error('UNIMPLEMENTED UNGROUP')
   },
 
   UPDATE: function(updateData) {
     var copyData = Object.assign({}, updateData)
+    var model = this.kninky.models[this.tableName]
+    model._prepSaveFields(copyData)
     console.log('update init data', copyData)
     for (var f in copyData) {
       var v = copyData[f]
       if (Array.isArray(v)) { //MORE RETHINK QUERY CODES
-        var model = this.kninky.models[this.tableName]
         if (v[0] == 99) { //ISO8601 DATE
           copyData[f] = new Date(v[1][0])
         }
@@ -453,6 +456,7 @@ staticR.prototype = {
 
   //STATIC METHODS (used directly rather than on a query builder)
   and: _r.__proto__.and,
+  branch: _r.__proto__.branch,
   db: _r.__proto__.db,
   desc: _r.__proto__.desc,
   expr: _r.__proto__.expr,

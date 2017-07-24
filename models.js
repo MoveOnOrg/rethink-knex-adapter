@@ -11,6 +11,8 @@ Document.prototype.save = function(callback) {
   if (this._exists || this[this._model.pk]) {
     options['conflict'] = 'update'
   }
+  this._prepSaveFields(this)
+  console.log('RUNNING document.save()')
   var res = this._model.save(this, options)
   return (callback ? res.then(callback) : res.then())
 }
@@ -75,6 +77,7 @@ dbModel.prototype = {
     // mostly NOT DONE. options only has {conflict: 'update'} possibility
     var self = this
     if (Array.isArray(objData)) {
+      objData = objData.map(self._prepSaveFields.bind(this))
       console.log('SAVE BATCH', objData.length, objData[0], options)
       return this.kninky.k.batchInsert(this.tableName, objData, 100).then(
         function(d) {
@@ -88,6 +91,8 @@ dbModel.prototype = {
         })
     } else {
       console.log('SAVE', objData, options)
+      this._prepSaveFields(objData)
+      this._prepSaveFields(this)
       var insertFunc = function() {
         // only set defaults on insert -- not on update
         if (self.kninky.defaultsUnsupported) {
@@ -114,8 +119,6 @@ dbModel.prototype = {
       }
 
       if (options && options.conflict == 'update') {
-        //STARTHERE: look for val, if so, then send update
-        //need to turn the insert into a function which waits on result
         var q = {}
         if (objData[this.pk]) {
           q[this.pk] = objData[this.pk]
@@ -137,6 +140,8 @@ dbModel.prototype = {
   },
   update: function(objData, serverData, q) {
     var self = this
+    this._prepSaveFields(objData)
+    this._prepSaveFields(this)
     if (!q) {
       var pkVal = objData[this.pk]
       if (pkVal) {
@@ -151,8 +156,16 @@ dbModel.prototype = {
         var newData = Object.assign({}, serverData, objData)
         console.log('SAVE UPDATE', newData)
         newData.__proto__ = new Document(self, self._options, true)
+        newData.replaced = 1
         return newData
       })
+  },
+  _prepSaveFields: function(objData) {
+    if (objData.replaced && !this.fields.replaced) {
+      delete objData.replaced
+      delete objData.__proto__.replaced
+    }
+    return objData
   },
   _updateDateFields: function(objData) {
     // converts date field numbers/strings into date objects
