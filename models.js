@@ -75,8 +75,17 @@ dbModel.prototype = {
     // mostly NOT DONE. options only has {conflict: 'update'} possibility
     var self = this
     if (Array.isArray(objData)) {
-      console.log('SAVE', objData.length, objData[0], options)
-      return this.kninky.k.batchInsert(this.tableName, objData, 100)
+      console.log('SAVE BATCH', objData.length, objData[0], options)
+      return this.kninky.k.batchInsert(this.tableName, objData, 100).then(
+        function(d) {
+          //batchInsert returns an array of create counts (or ids?)
+          // like [100, 200, 300, ....]
+          //MORETODO: not sure we need to make this return right thing
+          return d
+        },
+        function(err) {
+          console.error('BATCH INSERT ERROR', err)
+        })
     } else {
       console.log('SAVE', objData, options)
       var insertFunc = function() {
@@ -114,9 +123,9 @@ dbModel.prototype = {
           Object.assign(q, objData)
         }
         return this.kninky.k.table(this.tableName).where(q)
-          .select().then(function(count) {
-            if (count.length) {
-              return self.update(objData, q)
+          .select().then(function(serverData) {
+            if (serverData.length) {
+              return self.update(objData, serverData[0], q)
             } else {
               return insertFunc()
             }
@@ -126,7 +135,7 @@ dbModel.prototype = {
       }
     }
   },
-  update: function(objData, q) {
+  update: function(objData, serverData, q) {
     var self = this
     if (!q) {
       var pkVal = objData[this.pk]
@@ -139,7 +148,7 @@ dbModel.prototype = {
     }
     return this.kninky.k.table(this.tableName).where(q)
       .update(objData, this.pk).then(function(res) {
-        var newData = Object.assign({}, count[0], objData)
+        var newData = Object.assign({}, serverData, objData)
         console.log('SAVE UPDATE', newData)
         newData.__proto__ = new Document(self, self._options, true)
         return newData

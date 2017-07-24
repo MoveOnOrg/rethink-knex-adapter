@@ -157,14 +157,18 @@ rethinkQuery.prototype = {
             return model._updateDateFields(res)
           })
         }
-        if (x && self.pkVal && self.knexQuery._method == 'update') {
-          // needs to do a new select to get all the data back
-          return self.kninky.k.from(self.tableName)
-            .where(model.pk, self.pkVal).then(function(data){
-              console.log('UPDATED RECORD', data)
-              var newData = model._updateDateFields(data[0])
-              return newData
-            }).then(func, catchfunc)
+        if (x && self.pkVal) {
+            if (self.knexQuery._method == 'update') {
+              // needs to do a new select to get all the data back
+              return self.kninky.k.from(self.tableName)
+                .where(model.pk, self.pkVal).then(function(data){
+                  console.log('UPDATED RECORD', data)
+                  var newData = model._updateDateFields(data[0])
+                  return newData
+                }).then(func, catchfunc)
+            } else if (self.returnSingleObject && x.length) {
+              return func(x[0])
+            }
         }
         func(x)
       }, catchfunc)
@@ -273,13 +277,10 @@ rethinkQuery.prototype = {
     }
   },
 
-  FIND: function(func) {
-    console.log('UNIMPLEMENTED FIND')
-  },
-
   GET: function(pk_val) {  // returns single result
     var model = this.kninky.models[this.tableName]
     this.pkVal = pk_val
+    this.returnSingleObject = true
     this.knexQuery = this.knexQuery.where(model.pk, pk_val)
   },
 
@@ -325,6 +326,10 @@ rethinkQuery.prototype = {
   GROUP: function() {
     //TODO
     console.error('UNIMPLEMENTED GROUP')
+  },
+
+  INNER_JOIN: function(table_obj, func_code) {
+    console.error('UNIMPLEMENTED INNER_JOIN')
   },
 
   LIMIT: function(max) {
@@ -391,6 +396,13 @@ rethinkQuery.prototype = {
     }
     console.log('UPDATING', copyData)
     this.knexQuery = this.knexQuery.update(copyData)
+  },
+
+  ZIP: function() {
+    //un-does EQ_JOIN's separation of left/right
+    if (this.currentJoin) {
+      this.currentJoin.select = 'both'
+    }
   }
 }
 

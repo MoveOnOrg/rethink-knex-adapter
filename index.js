@@ -54,6 +54,10 @@ dumbThinky.prototype = {
         if (fieldName.endsWith('_id') && !kninkyField.noReference) {
           var refTable = fieldName.split('_id')[0]
           kField = kField.references('id').inTable(refTable)
+          if (!kninkyField.nullable && kninkyField.defaultVal == '') {
+            //stupid rethink pattern of foreign keys being allowNull(false).default('')
+            kField = kField.nullable()
+          }
         }
         // is primary key?
         if (pkDict && pkDict.pk && pkDict.pk == fieldName) {
