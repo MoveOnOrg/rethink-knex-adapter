@@ -127,8 +127,7 @@ rethinkQuery.prototype = {
 
       return this.knexQuery.then(function(x) {
         //TODO: need to ?sometimes? turn knex results into model objects
-        console.log('knex result b', self.brackets)
-        console.log('knex result', x)
+        console.log('knex result', x, self.brackets)
         if (self.currentJoin && !self.currentJoin.select) {
           x = x.map(function(res) {
             var newObj = {'left':{}, 'right': {}}
@@ -142,6 +141,10 @@ rethinkQuery.prototype = {
               }
             }
           })
+        }
+        if (self.mapFunc) {
+          x = x.map(self.mapFunc)
+          console.log('knex result mapped', x[0])
         }
         if (self.brackets.length) {
           //MORETODO?: brackets need to be laced with the right parts
@@ -157,14 +160,19 @@ rethinkQuery.prototype = {
             return model._updateDateFields(res)
           })
         }
-        if (x && self.pkVal && self.knexQuery._method == 'update') {
-          // needs to do a new select to get all the data back
-          return self.kninky.k.from(self.tableName)
-            .where(model.pk, self.pkVal).then(function(data){
-              console.log('UPDATED RECORD', data)
-              var newData = model._updateDateFields(data[0])
-              return newData
-            }).then(func, catchfunc)
+        if (x && self.pkVal) {
+            if (self.knexQuery._method == 'update') {
+              // needs to do a new select to get all the data back
+              return self.kninky.k.from(self.tableName)
+                .where(model.pk, self.pkVal).then(function(data){
+                  console.log('UPDATED RECORD', data)
+                  var newData = model._updateDateFields(data[0])
+                  newData.replaced = x // count (i think)
+                  return newData
+                }).then(func, catchfunc)
+            } else if (self.returnSingleObject && x.length) {
+              return func(x[0])
+            }
         }
         func(x)
       }, catchfunc)
@@ -273,13 +281,10 @@ rethinkQuery.prototype = {
     }
   },
 
-  FIND: function(func) {
-    console.log('UNIMPLEMENTED FIND')
-  },
-
   GET: function(pk_val) {  // returns single result
     var model = this.kninky.models[this.tableName]
     this.pkVal = pk_val
+    this.returnSingleObject = true
     this.knexQuery = this.knexQuery.where(model.pk, pk_val)
   },
 
@@ -327,15 +332,51 @@ rethinkQuery.prototype = {
     console.error('UNIMPLEMENTED GROUP')
   },
 
+  INNER_JOIN: function(table_obj, funcCode) {
+    console.error('UNIMPLEMENTED INNER_JOIN')
+  },
+
   LIMIT: function(max) {
     if (this.knexQuery) {
       this.knexQuery = this.knexQuery.limit(max)
     }
   },
 
-  MERGE: function(func) {
+  MAP: function(func_or_dict) {
+    if (Array.isArray(func_or_dict)) {
+      // horrid thing that will probably look like:
+      // [69, [ [2,[3]], {"value":[170,[[13],"answer_option"]],
+      //                  "interaction_step_id":[170,[[13],"id"]]} ]]
+      if (func_or_dict[0] == 69) {
+        var valDict = func_or_dict[1][1] //maybe
+        var usefulMapping = []
+        for (var a in valDict) {
+          var v = valDict[a]
+          if (Array.isArray(v) && v[0] == 170) {//170==bracket
+            usefulMapping.push([a, v[1][1]])
+          }
+        }
+        if (usefulMapping.length) {
+          this.mapFunc = function(obj) {
+            var newObj = {}
+            usefulMapping.map(function(m) {
+              newObj[ m[0] ] = obj[ m[1] ]
+            })
+            return newObj
+          }
+        } else {
+          console.error('MAP: PROBABLY FAILED', JSON.stringify(func_or_dict))
+        }
+      }
+    } else if (typeof func_or_dict == 'function') {
+      this.mapFunc = func_or_dict
+    }
+  },
+
+  MERGE: function(funcCode) {
     //TODO
-    console.error('UNIMPLEMENTED MERGE ')
+    var funcFlat = this.flattenQuery(funcCode, true)
+    console.error('UNIMPLEMENTED MERGE ', JSON.stringify(funcFlat))
   },
 
   ORDER_BY: function(desc_res) {
@@ -374,16 +415,22 @@ rethinkQuery.prototype = {
   },
 
   UNGROUP: function() {
-
+    console.error('UNIMPLEMENTED UNGROUP')
   },
 
   UPDATE: function(updateData) {
+    if (Array.isArray(updateData)) {
+      var funcFlat = this.flattenQuery(updateData, true)
+      console.error('UNSUPOORTED UPDATE', JSON.stringify(funcFlat))
+      return
+    }
     var copyData = Object.assign({}, updateData)
+    var model = this.kninky.models[this.tableName]
+    model._prepSaveFields(copyData)
     console.log('update init data', copyData)
     for (var f in copyData) {
       var v = copyData[f]
       if (Array.isArray(v)) { //MORE RETHINK QUERY CODES
-        var model = this.kninky.models[this.tableName]
         if (v[0] == 99) { //ISO8601 DATE
           copyData[f] = new Date(v[1][0])
         }
@@ -391,6 +438,13 @@ rethinkQuery.prototype = {
     }
     console.log('UPDATING', copyData)
     this.knexQuery = this.knexQuery.update(copyData)
+  },
+
+  ZIP: function() {
+    //un-does EQ_JOIN's separation of left/right
+    if (this.currentJoin) {
+      this.currentJoin.select = 'both'
+    }
   }
 }
 
@@ -441,6 +495,7 @@ staticR.prototype = {
 
   //STATIC METHODS (used directly rather than on a query builder)
   and: _r.__proto__.and,
+  branch: _r.__proto__.branch,
   db: _r.__proto__.db,
   desc: _r.__proto__.desc,
   expr: _r.__proto__.expr,

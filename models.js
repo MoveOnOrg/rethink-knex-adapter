@@ -11,6 +11,7 @@ Document.prototype.save = function(callback) {
   if (this._exists || this[this._model.pk]) {
     options['conflict'] = 'update'
   }
+  console.log('RUNNING document.save()')
   var res = this._model.save(this, options)
   return (callback ? res.then(callback) : res.then())
 }
@@ -75,10 +76,22 @@ dbModel.prototype = {
     // mostly NOT DONE. options only has {conflict: 'update'} possibility
     var self = this
     if (Array.isArray(objData)) {
-      console.log('SAVE', objData.length, objData[0], options)
-      return this.kninky.k.batchInsert(this.tableName, objData, 100)
+      objData = objData.map(self._prepSaveFields.bind(this))
+      console.log('SAVE BATCH', objData.length, objData[0], options)
+      return this.kninky.k.batchInsert(this.tableName, objData, 100).then(
+        function(d) {
+          //batchInsert returns an array of create counts (or ids?)
+          // like [100, 200, 300, ....]
+          //MORETODO: not sure we need to make this return right thing
+          return d
+        },
+        function(err) {
+          console.error('BATCH INSERT ERROR', err)
+        })
     } else {
       console.log('SAVE', objData, options)
+      this._prepSaveFields(objData)
+      this._prepSaveFields(this)
       var insertFunc = function() {
         // only set defaults on insert -- not on update
         if (self.kninky.defaultsUnsupported) {
@@ -105,8 +118,6 @@ dbModel.prototype = {
       }
 
       if (options && options.conflict == 'update') {
-        //STARTHERE: look for val, if so, then send update
-        //need to turn the insert into a function which waits on result
         var q = {}
         if (objData[this.pk]) {
           q[this.pk] = objData[this.pk]
@@ -114,9 +125,9 @@ dbModel.prototype = {
           Object.assign(q, objData)
         }
         return this.kninky.k.table(this.tableName).where(q)
-          .select().then(function(count) {
-            if (count.length) {
-              return self.update(objData, q)
+          .select().then(function(serverData) {
+            if (serverData.length) {
+              return self.update(objData, serverData[0], q)
             } else {
               return insertFunc()
             }
@@ -126,8 +137,10 @@ dbModel.prototype = {
       }
     }
   },
-  update: function(objData, q) {
+  update: function(objData, serverData, q) {
     var self = this
+    this._prepSaveFields(objData)
+    this._prepSaveFields(this)
     if (!q) {
       var pkVal = objData[this.pk]
       if (pkVal) {
@@ -139,11 +152,19 @@ dbModel.prototype = {
     }
     return this.kninky.k.table(this.tableName).where(q)
       .update(objData, this.pk).then(function(res) {
-        var newData = Object.assign({}, count[0], objData)
+        var newData = Object.assign({}, serverData, objData)
         console.log('SAVE UPDATE', newData)
         newData.__proto__ = new Document(self, self._options, true)
+        newData.replaced = 1
         return newData
       })
+  },
+  _prepSaveFields: function(objData) {
+    if (objData.replaced && !this.fields.replaced) {
+      delete objData.replaced
+      delete objData.__proto__.replaced
+    }
+    return objData
   },
   _updateDateFields: function(objData) {
     // converts date field numbers/strings into date objects
@@ -246,6 +267,10 @@ modelType.prototype = {
     return this
   },
   //conversion
+  foreign: function(tableName) {
+    this.foreignReference = tableName
+    return this
+  },
   stopReference: function() {
     //stops default behavior to link '_id' fields to the referencing table
     this.noReference = true
