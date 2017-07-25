@@ -51,7 +51,7 @@ I'll take pull requests!
  - [ ] `group()`
  - [ ] `innerJoin()`
  - [x] `limit(max)`
- - [?] `map(func)` -- probably not, but might work
+ - [ ] `map(func)` -- probably not, but might work (if rethink doesn't process it into bytecode)
  - [x] `map({targetVal: r.row(sourceColumn), ...})`
  - [ ] `merge()`
  - [x] `orderBy(column)`
