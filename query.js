@@ -127,8 +127,7 @@ rethinkQuery.prototype = {
 
       return this.knexQuery.then(function(x) {
         //TODO: need to ?sometimes? turn knex results into model objects
-        console.log('knex result b', self.brackets)
-        console.log('knex result', x)
+        console.log('knex result', x, self.brackets)
         if (self.currentJoin && !self.currentJoin.select) {
           x = x.map(function(res) {
             var newObj = {'left':{}, 'right': {}}
@@ -142,6 +141,10 @@ rethinkQuery.prototype = {
               }
             }
           })
+        }
+        if (self.mapFunc) {
+          x = x.map(self.mapFunc)
+          console.log('knex result mapped', x[0])
         }
         if (self.brackets.length) {
           //MORETODO?: brackets need to be laced with the right parts
@@ -336,6 +339,37 @@ rethinkQuery.prototype = {
   LIMIT: function(max) {
     if (this.knexQuery) {
       this.knexQuery = this.knexQuery.limit(max)
+    }
+  },
+
+  MAP: function(func_or_dict) {
+    if (Array.isArray(func_or_dict)) {
+      // horrid thing that will probably look like:
+      // [69, [ [2,[3]], {"value":[170,[[13],"answer_option"]],
+      //                  "interaction_step_id":[170,[[13],"id"]]} ]]
+      if (func_or_dict[0] == 69) {
+        var valDict = func_or_dict[1][1] //maybe
+        var usefulMapping = []
+        for (var a in valDict) {
+          var v = valDict[a]
+          if (Array.isArray(v) && v[0] == 170) {//170==bracket
+            usefulMapping.push([a, v[1][1]])
+          }
+        }
+        if (usefulMapping.length) {
+          this.mapFunc = function(obj) {
+            var newObj = {}
+            usefulMapping.map(function(m) {
+              newObj[ m[0] ] = obj[ m[1] ]
+            })
+            return newObj
+          }
+        } else {
+          console.error('MAP: PROBABLY FAILED', JSON.stringify(func_or_dict))
+        }
+      }
+    } else if (typeof func_or_dict == 'function') {
+      this.mapFunc = func_or_dict
     }
   },
 
