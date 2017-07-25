@@ -295,7 +295,7 @@ rethinkQuery.prototype = {
     var model = this.kninky.models[this.tableName]
     var index = [model.pk] //default
     var lastArg = arguments[arguments.length-1]
-    var notValArgs = (lastArg.index ? 1 : 0)
+    var notValArgs = ((lastArg && lastArg.index) ? 1 : 0)
     // all but the last arg, if it's the index thingie:
     var valArgs = Array.prototype.slice.call(arguments, 0, arguments.length - notValArgs);
     if (lastArg.index
