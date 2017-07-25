@@ -463,7 +463,7 @@ function staticR(kninky) {
   return _r
 }
 
-var _r = Rethink()
+var _r = Rethink({pool: false})
 staticR.prototype = {
   nextVarId: 0, //this is used to index variable references in queries
   xxtable: function(table, options) {
