@@ -267,6 +267,10 @@ modelType.prototype = {
     return this
   },
   //conversion
+  foreign: function(tableName) {
+    this.foreignReference = tableName
+    return this
+  },
   stopReference: function() {
     //stops default behavior to link '_id' fields to the referencing table
     this.noReference = true
