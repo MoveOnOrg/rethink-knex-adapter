@@ -23,3 +23,44 @@ This project tries to implement a good portion of the Thinky api through Knex, b
 * If you add 'timestamps' to the third argument of createModel,
   it will add `created_at` and `updated_at` timestamp fields
   (you can also use the 'standard' `r.type.date().default(r.now())` code)
+
+* `type.point()` is not supported -- I suggest you change your schema to separate fields for lat/lng
+
+* `type.array()` and `type.object()` are not supported (`object()` is only ok for createModel's table definition)
+
+## Currently supported query methods
+
+Not all queries on `r....` are supported -- some of them are too much of a pain to implement.
+I'll take pull requests!
+
+ - [x] bracket -- e.g. `r.table('foo').getAll(bar, {'index': 'bars'}).limit(1)(0)` (The last `(0)` is the 'bracket')
+ - [x] bracket post-join for `left`/`right`, e.g. `...eqJoin(foo, r.table(bar))('right')`
+ - [ ] `changes()`
+ - [x] `count()`
+ - [x] `default(defaultVal)`
+ - [x] `delete()`
+ - [x] `distinct()` NOTE: at least if it works as a sql query
+ - [x] `eqJoin(leftTableField, r.table(rightTable))`
+ - [x] `eqJoin(leftTableField, r.table(rightTable), rightTableIndex)`
+ - [x] `filter(dictOfQueryValues)`
+ - [ ] `filter(function)`
+ - [x] `get(pkValue)`
+ - [x] `getAll(val, {index: column})` (column defaults to pk if not avail)
+ - [x] `getAll(...bunchOfIds, {index: column})`
+ - [x] `getAll([val1, val2], {index: multi_column_index})`
+ - [ ] `group()`
+ - [ ] `innerJoin()`
+ - [x] `limit(max)`
+ - [?] `map(func)` -- probably not, but might work
+ - [x] `map({targetVal: r.row(sourceColumn), ...})`
+ - [ ] `merge()`
+ - [x] `orderBy(column)`
+ - [x] `orderBy(r.desc(column))`
+ - [x] `pluck(fieldname_or_index)`
+ - [ ] `pluck(function)`
+ - [ ] `sum()`
+ - [x] `table(table)`
+ - [ ] `ungroup`
+ - [x] `update(updateData)`
+ - [x] `zip()`
+
