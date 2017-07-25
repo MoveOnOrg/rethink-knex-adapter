@@ -451,16 +451,9 @@ rethinkQuery.prototype = {
 function staticR(kninky) {
   console.log('STATICR', this)
   this.kninky = kninky
+  this.k = kninky.k //keep it convenient
 
   return this
-  var _r = function(x) {
-    return new Term(_r).expr(x)
-  }
-  //_r.__proto__ = this.__proto__
-  //_r.row = new Term(_r).row()
-  _r._Term = Term
-  console.log('PROTOTYPE', this.prototype)
-  return _r
 }
 
 var _r = Rethink({pool: false})
