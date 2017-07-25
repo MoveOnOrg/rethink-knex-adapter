@@ -11,7 +11,6 @@ Document.prototype.save = function(callback) {
   if (this._exists || this[this._model.pk]) {
     options['conflict'] = 'update'
   }
-  this._prepSaveFields(this)
   console.log('RUNNING document.save()')
   var res = this._model.save(this, options)
   return (callback ? res.then(callback) : res.then())

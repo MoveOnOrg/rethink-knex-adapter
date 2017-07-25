@@ -385,6 +385,11 @@ rethinkQuery.prototype = {
   },
 
   UPDATE: function(updateData) {
+    if (Array.isArray(updateData)) {
+      var funcFlat = this.flattenQuery(updateData, true)
+      console.error('UNSUPOORTED UPDATE', JSON.stringify(funcFlat))
+      return
+    }
     var copyData = Object.assign({}, updateData)
     var model = this.kninky.models[this.tableName]
     model._prepSaveFields(copyData)
