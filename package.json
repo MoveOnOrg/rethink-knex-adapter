@@ -1,0 +1,26 @@
+{
+  "name": "rethink-knex-adapter",
+  "version": "0.3",
+  "description": "Knex adapter for rethinkdb/thinky APIs to convert a project with less effort",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MoveOnOrg/rethink-knex-adapter.git"
+  },
+  "keywords": [
+    "knex",
+    "migrate",
+    "orm",
+    "rethinkdb"
+  ],
+  "author": "Sky Duveen",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/MoveOnOrg/rethink-knex-adapter/issues"
+  },
+  "dependencies": {
+    "bluebird": "~2.10.2",
+    "knex": "^0.13.0",
+    "rethinkdbdash": "~2.3.0",
+    "thinky": "^2.3.3"
+  }
+}
