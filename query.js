@@ -478,7 +478,8 @@ rethinkQuery.prototype = {
 function staticR(kninky) {
   log('STATICR', this)
   this.kninky = kninky
-  this.k = kninky.k //keep it convenient
+  this.k = kninky.k // keep it convenient
+  this.knex = kninky.k // keep it convenient and readable
 
   return this
 }
