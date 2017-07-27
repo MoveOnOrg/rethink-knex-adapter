@@ -26,6 +26,24 @@ for (var b in ProtoDef.Datum.DatumType) {
   reverseDatum[ProtoDef.Datum.DatumType[b]] = b
 }
 
+function log() {
+  console.log.apply(null, arguments)
+  if (process.env.RETHINK_KNEX_DEBUG) {
+    // doesn't work :-(
+  }
+}
+
+function error() {
+  if (process.env.RETHINK_KNEX_HARD_FAIL) {
+    console.error.apply(null, arguments)
+    // unlikely to stop the process, because
+    // it will often be wrapped in a Promise,
+    // but we can try :-)
+    throw new Error(arguments)
+  } else {
+    console.error.apply(null, arguments)
+  }
+}
 
 function rethinkQuery(kninky, query) {
   this.kninky = kninky
@@ -93,7 +111,7 @@ rethinkQuery.prototype = {
       if (cmd in this) {
         this[cmd].apply(this, args)
       } else {
-        console.log('MISSING IMPLEMENTATION', cmd)
+        log('MISSING IMPLEMENTATION', cmd)
       }
     }
   },
@@ -102,12 +120,12 @@ rethinkQuery.prototype = {
     var self = this
     var model = this.kninky.models[this.tableName]
 
-    console.log('running then()')
+    log('running then()')
     if (this.isChangesListener) {
       //TODO: setup a ?local listener for save changes
-      console.log('UNIMPLEMENTED: CHANGES LISTENER')
+      log('UNIMPLEMENTED: CHANGES LISTENER')
     } else if (this.knexQuery) {
-      console.log('KNEX QUERY', this.knexQuery._method)
+      log('KNEX QUERY', this.knexQuery._method)
       if (self.currentJoin && !self.currentJoin.select) {
         // we need to structure the output as {'left': {...}, 'right': {....}}
         // so we need to make the fields distinguishable to separate them later
@@ -127,7 +145,7 @@ rethinkQuery.prototype = {
 
       return this.knexQuery.then(function(x) {
         //TODO: need to ?sometimes? turn knex results into model objects
-        console.log('knex result', x, self.brackets)
+        log('knex result', x, self.brackets)
         if (self.currentJoin && !self.currentJoin.select) {
           x = x.map(function(res) {
             var newObj = {'left':{}, 'right': {}}
@@ -144,7 +162,7 @@ rethinkQuery.prototype = {
         }
         if (self.mapFunc) {
           x = x.map(self.mapFunc)
-          console.log('knex result mapped', x[0])
+          log('knex result mapped', x[0])
         }
         if (self.brackets.length) {
           //MORETODO?: brackets need to be laced with the right parts
@@ -165,7 +183,7 @@ rethinkQuery.prototype = {
               // needs to do a new select to get all the data back
               return self.kninky.k.from(self.tableName)
                 .where(model.pk, self.pkVal).then(function(data){
-                  console.log('UPDATED RECORD', data)
+                  log('UPDATED RECORD', data)
                   var newData = model._updateDateFields(data[0])
                   newData.replaced = x // count (i think)
                   return newData
@@ -248,7 +266,7 @@ rethinkQuery.prototype = {
       // example: [ 15, [ 'organization' ] ]
       rightTableName = rTableResult[1][0]
     } else {
-      console.error("right join table of unknown type", rTableResult)
+      error("right join table of unknown type", rTableResult)
       throw new Error('right join table of unknown type')
     }
     this.currentJoin = {
@@ -259,7 +277,7 @@ rethinkQuery.prototype = {
     var rightTableField = ((rightTableIndex && rightTableIndex.index)
                            ? rightTableIndex.index
                            : rightModel.pk)
-    console.log('right model', rTableResult)
+    log('right model', rTableResult)
     this.knexQuery = this.knexQuery.join(
       rightTableName,
       this.tableName + '.' + leftTableField,
@@ -273,7 +291,7 @@ rethinkQuery.prototype = {
     if (Array.isArray(func_or_dict)) {
       //need to process the function as byte-code-ish stuff
       var funccode = this.flattenQuery(func_or_dict, true)
-      console.log('FUNCCODE', JSON.stringify(funccode))
+      log('FUNCCODE', JSON.stringify(funccode))
       // MORETODO
       //then()
     } else if (func_or_dict) {
@@ -318,7 +336,7 @@ rethinkQuery.prototype = {
           queryDict[ind] = valArgs[i]
         }
       })
-      console.log('queryDict', queryDict)
+      log('queryDict', queryDict)
       if (model.pk in queryDict) {
         this.pkVal = queryDict[model.pk]
       }
@@ -329,11 +347,11 @@ rethinkQuery.prototype = {
 
   GROUP: function() {
     //TODO
-    console.error('UNIMPLEMENTED GROUP')
+    error('UNIMPLEMENTED GROUP')
   },
 
   INNER_JOIN: function(table_obj, funcCode) {
-    console.error('UNIMPLEMENTED INNER_JOIN')
+    error('UNIMPLEMENTED INNER_JOIN')
   },
 
   LIMIT: function(max) {
@@ -365,7 +383,7 @@ rethinkQuery.prototype = {
             return newObj
           }
         } else {
-          console.error('MAP: PROBABLY FAILED', JSON.stringify(func_or_dict))
+          error('MAP: PROBABLY FAILED', JSON.stringify(func_or_dict))
         }
       }
     } else if (typeof func_or_dict == 'function') {
@@ -376,7 +394,12 @@ rethinkQuery.prototype = {
   MERGE: function(funcCode) {
     //TODO
     var funcFlat = this.flattenQuery(funcCode, true)
-    console.error('UNIMPLEMENTED MERGE ', JSON.stringify(funcFlat))
+    error('UNIMPLEMENTED MERGE ', JSON.stringify(funcFlat))
+  },
+
+  NTH: function(index) {
+    this.returnSingleObject = true
+    this.knexQuery = this.knexQuery.limit(1).offset(index)
   },
 
   ORDER_BY: function(desc_res) {
@@ -392,7 +415,7 @@ rethinkQuery.prototype = {
         //FUTURE: dumb feature, let's not implement
         return
       }
-      console.log('orderBy', key, direction)
+      log('orderBy', key, direction)
       this.knexQuery = this.knexQuery.orderBy(key, direction)
     }
   },
@@ -415,19 +438,19 @@ rethinkQuery.prototype = {
   },
 
   UNGROUP: function() {
-    console.error('UNIMPLEMENTED UNGROUP')
+    error('UNIMPLEMENTED UNGROUP')
   },
 
   UPDATE: function(updateData) {
     if (Array.isArray(updateData)) {
       var funcFlat = this.flattenQuery(updateData, true)
-      console.error('UNSUPOORTED UPDATE', JSON.stringify(funcFlat))
+      error('UNSUPOORTED UPDATE', JSON.stringify(funcFlat))
       return
     }
     var copyData = Object.assign({}, updateData)
     var model = this.kninky.models[this.tableName]
     model._prepSaveFields(copyData)
-    console.log('update init data', copyData)
+    log('update init data', copyData)
     for (var f in copyData) {
       var v = copyData[f]
       if (Array.isArray(v)) { //MORE RETHINK QUERY CODES
@@ -436,7 +459,7 @@ rethinkQuery.prototype = {
         }
       }
     }
-    console.log('UPDATING', copyData)
+    log('UPDATING', copyData)
     this.knexQuery = this.knexQuery.update(copyData)
   },
 
@@ -449,7 +472,7 @@ rethinkQuery.prototype = {
 }
 
 function staticR(kninky) {
-  console.log('STATICR', this)
+  log('STATICR', this)
   this.kninky = kninky
   this.k = kninky.k //keep it convenient
 
@@ -471,11 +494,11 @@ staticR.prototype = {
         return Promise.resolve({
           _getToken: function(){},
           db: {notnull:true},
-          emit: function(){console.log('emit')},
+          emit: function(){log('emit')},
           _send: function(query, token, resolve, reject, originalQuery, options, end) {
             var r2kQuery = new rethinkQuery(self.kninky, query)
-            console.log('SEND', JSON.stringify(query))
-            console.log('SEND flat', JSON.stringify(r2kQuery.flattened))
+            log('SEND', JSON.stringify(query))
+            log('SEND flat', JSON.stringify(r2kQuery.flattened))
             r2kQuery.processQuery()
             r2kQuery.then(resolve, reject)
           },
