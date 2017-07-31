@@ -430,7 +430,7 @@ rethinkQuery.prototype = {
   },
 
   SUM: function() {
-
+    error('UNIMPLEMENTED SUM ')
   },
 
   TABLE: function(tableName) {
