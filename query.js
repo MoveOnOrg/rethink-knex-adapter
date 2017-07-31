@@ -215,12 +215,6 @@ rethinkQuery.prototype = {
         columns.push(selectTable + '.' + sField)
       }
       this.knexQuery = this.knexQuery.select(columns)
-    } else if (this.currentPluck == index) {
-      // do nothing: this is knex's default behavior:
-      //  pluck('foo') => ['foo_value1', 'foo_value2'...]
-      // whereas rethinkdb defaults to
-      //  pluck('foo') => [{'foo': 'foo_value1'}, {'foo': foo_value2'},...]
-      // but r.pluck('foo')('foo') is so common, we'll just ASSUME it
     } else {
       this.brackets.push(index)
     }
@@ -427,11 +421,12 @@ rethinkQuery.prototype = {
     }
   },
 
-  PLUCK: function(fieldName) {
+  PLUCK: function(fieldNames) {
+    // confusingly, knex:pluck() does what's called 'bracket' in rethinkdb
+    // fieldNames can be an array of columns or just a single column name (most common)
     if (this.knexQuery) {
-      this.knexQuery = this.knexQuery.pluck(fieldName)
+      this.knexQuery = this.knexQuery.select(fieldNames)
     }
-    this.currentPluck = fieldName // for bracket, it's redundant
   },
 
   SUM: function() {
