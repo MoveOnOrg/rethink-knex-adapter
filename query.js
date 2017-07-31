@@ -27,9 +27,8 @@ for (var b in ProtoDef.Datum.DatumType) {
 }
 
 function log() {
-  console.log.apply(null, arguments)
   if (process.env.RETHINK_KNEX_DEBUG) {
-    // doesn't work :-(
+    console.log.apply(null, arguments)
   }
 }
 
@@ -320,7 +319,8 @@ rethinkQuery.prototype = {
     var notValArgs = ((lastArg && lastArg.index) ? 1 : 0)
     // all but the last arg, if it's the index thingie:
     var valArgs = Array.prototype.slice.call(arguments, 0, arguments.length - notValArgs);
-    if (lastArg.index
+    if (lastArg
+        && lastArg.index
         && lastArg.index != model.pk
         && lastArg.index in model.indexes
        ) {
@@ -345,8 +345,11 @@ rethinkQuery.prototype = {
         this.pkVal = queryDict[model.pk]
       }
       this.knexQuery = this.knexQuery.where(queryDict)
+    } else {
+      // nothing to get -- better get nothing or we
+      // might be running .delete() on 'all' instead of 'none'
+      this.knexQuery = this.knexQuery.where(model.pk, -997)
     }
-
   },
 
   GROUP: function() {
