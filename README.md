@@ -35,7 +35,7 @@ I'll take pull requests!
 
  - [x] bracket -- e.g. `r.table('foo').getAll(bar, {'index': 'bars'}).limit(1)(0)` (The last `(0)` is the 'bracket')
  - [x] bracket post-join for `left`/`right`, e.g. `...eqJoin(foo, r.table(bar))('right')`
- - [ ] `changes()`
+ - [ ] `changes()` (see below)
  - [x] `count()`
  - [x] `default(defaultVal)`
  - [x] `delete()`
@@ -64,3 +64,26 @@ I'll take pull requests!
  - [x] `update(updateData)`
  - [x] `zip()`
 
+## changes()
+
+Though we do not support how `changes()` works in rethinkdb -- which are essentially uploaded
+triggers back to your code, what IS implemented is a model listener.  So if you run:
+
+```javascript
+r.table('foo').changes().then(function(res) {
+   if (res.old_val) { // was an update
+      seeDifferences(res.old_val.field1, res.new_val.field2)
+   } else { // was an insert record
+      doSomething(res.new_val)
+   }
+})
+```
+
+You'll note that you can't run `filter()` before hand.  The function
+signature is also pretty different (no cursors, etc)
+
+This will also not trigger unless the change was done through and by
+the same process with the thinky() connection that you registered
+with.  If you are adapting a code base, this might mean you need to
+load/setup your `changes()` listener in other processes that send
+changes to the relevant models.

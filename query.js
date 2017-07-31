@@ -121,7 +121,9 @@ rethinkQuery.prototype = {
 
     log('running then()')
     if (this.isChangesListener) {
-      //TODO: setup a ?local listener for save changes
+      if (this.goodChangeListener) {
+        model.changeListeners.push(func)
+      }
       log('UNIMPLEMENTED: CHANGES LISTENER')
     } else if (this.knexQuery) {
       log('KNEX QUERY', this.knexQuery._method)
@@ -222,6 +224,9 @@ rethinkQuery.prototype = {
 
   CHANGES: function() {
     this.isChangesListener = true
+    // We have a different API than rethinkdb,
+    // so track obvious mis-uses
+    this.goodChangeListener = true
   },
 
   COUNT: function() {
@@ -289,6 +294,10 @@ rethinkQuery.prototype = {
       //need to process the function as byte-code-ish stuff
       var funccode = this.flattenQuery(func_or_dict, true)
       log('FUNCCODE', JSON.stringify(funccode))
+      if (this.isChangesListener) {
+        this.goodChangeListener = false
+        error('changes() in rethink-knex-adapter has a different API.  Please see documentation')
+      }
       // MORETODO
       //then()
     } else if (func_or_dict) {
