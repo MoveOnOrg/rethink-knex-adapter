@@ -170,9 +170,18 @@ rethinkQuery.prototype = {
           log('knex result mapped', x[0])
         }
         if (self.brackets.length) {
-          //MORETODO?: brackets need to be laced with the right parts
-          // and then maybe iterated through
-          x = x[self.brackets.pop()]
+          var b;
+          while (b = self.brackets.pop()) {
+            if (typeof b == 'string') {
+              // this is a key so, e.g. pluck('foo')('foo') => ['fooValue1', 'fooValue2', ...]
+              x = x.map(function(d) {
+                return d[b]
+              })
+            } else if (typeof b == 'number') {
+              // this is an index so e.g. pluck('foo')(0) => [{'foo': 'fooValue1'}]
+              x = x[b]
+            }
+          }
         }
         if (!x && self.defaultVal) {
           x = self.defaultVal
