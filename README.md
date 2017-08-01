@@ -8,7 +8,34 @@ This project tries to implement a good portion of the Thinky api through Knex, b
 
 ## Configuration/Code Migration
 
-...
+The first step to switching is wherever in your code you have something like:
+
+```javascript
+// OLD CODE:
+import thinky from 'thinky'
+export default thinky({
+   host: process.env.DB_HOST,
+   ...
+ })
+```
+
+change it to:
+```javascript
+import dumbThinky from 'rethink-knex-adapter'
+export default dumbThinky({
+   //KNEX CONFIG HERE
+   client: 'sqlite3',
+   connection: { filename: "./mydb.sqlite" },
+   // for sqlite and other backends that don't support field defaults
+   defaultUnsupported: true
+})
+```
+
+Probably the next steps will be:
+
+1. Migrate any `array()` or `object()` fields to other tables or textfields with dumped json.
+2. Change unsupported methods from `r.table('foo')...` to `r.knex.from('foo')...` to use
+   a direct connection to the knex driver.
 
 ## Schema creation
 
