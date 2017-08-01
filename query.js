@@ -254,6 +254,9 @@ rethinkQuery.prototype = {
 
   DELETE: function() {
     if (this.knexQuery) {
+      if (this.emptyMatch) {
+        this.knexQuery = this.knexQuery.where(model.pk, -997)
+      }
       this.knexQuery = this.knexQuery.delete()
     }
   },
@@ -382,10 +385,10 @@ rethinkQuery.prototype = {
       }
       this._conformQuery(queryDict, model)
       this.knexQuery = this.knexQuery.where(queryDict)
-    } else {
-      // nothing to get -- better get nothing or we
+    } else if (lastArg && lastArg.index && valArgs.length == 0) {
+      // nothing to get
       // might be running .delete() on 'all' instead of 'none'
-      this.knexQuery = this.knexQuery.where(model.pk, -997)
+      this.emptyMatch = true
     }
   },
 
@@ -505,6 +508,9 @@ rethinkQuery.prototype = {
       }
     }
     log('UPDATING', copyData)
+    if (this.emptyMatch) {
+      this.knexQuery = this.knexQuery.where(model.pk, -997)
+    }
     this.knexQuery = this.knexQuery.update(copyData)
   },
 
