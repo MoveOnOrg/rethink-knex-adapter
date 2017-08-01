@@ -287,14 +287,31 @@ modelType.prototype = {
     return this
   },
   toKnex: function(table, fieldName, knex) {
-    var kField = table[this.fieldType](fieldName)
+    var kField;
+    if ((fieldName.endsWith('_id') || this.foreignReference) && !this.noReference) {
+      // need to morph reference fields into integers
+      if (!this.foreignReference) {
+        this.foreignReference = fieldName.split('_id')[0]
+      }
+      this.fieldType = 'integer'
+      kField = table[this.fieldType](fieldName).references('id').inTable(this.foreignReference)
+      if (this.nullable || this.defaultVal == '') {
+        //stupid rethink pattern of foreign keys being allowNull(false).default('')
+        kField = kField.nullable()
+        this.nullable = true
+        this.defaultVal = null
+      }
+    } else {
+      kField = table[this.fieldType](fieldName)
+      if (this.defaultVal) {
+        kField = kField.defaultTo(this.defaultVal)
+      } else if (this.timestamp && this.timestamp == 'now') {
+        kField = kField.defaultTo(knex.fn.now())
+      }
+    }
+
     if (!this.nullable) {
       kField = kField.notNullable()
-    }
-    if (this.defaultVal) {
-      kField = kField.defaultTo(this.defaultVal)
-    } else if (this.timestamp && this.timestamp == 'now') {
-      kField = kField.defaultTo(knex.fn.now())
     }
     return kField
   }

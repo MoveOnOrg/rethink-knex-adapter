@@ -123,8 +123,9 @@ rethinkQuery.prototype = {
     if (this.isChangesListener) {
       if (this.goodChangeListener) {
         model.changeListeners.push(func)
+      } else {
+        log('UNIMPLEMENTED: CHANGES LISTENER')
       }
-      log('UNIMPLEMENTED: CHANGES LISTENER')
     } else if (this.knexQuery) {
       log('KNEX QUERY', this.knexQuery._method)
       if (self.currentJoin && !self.currentJoin.select) {
@@ -317,6 +318,9 @@ rethinkQuery.prototype = {
 
   GET: function(pk_val) {  // returns single result
     var model = this.kninky.models[this.tableName]
+    if (pk_val && model.fields[model.pk].fieldType == 'integer') {
+      pk_val = parseInt(pk_val)
+    }
     this.pkVal = pk_val
     this.returnSingleObject = true
     this.knexQuery = this.knexQuery.where(model.pk, pk_val)
@@ -342,7 +346,11 @@ rethinkQuery.prototype = {
 
     if (valArgs.length > 1) {
       // do whereIn here
-      this.knexQuery = this.knexQuery.whereIn(index[0], valArgs)
+      var f = index[0]
+      if (model.fields[f].fieldType == 'integer') {
+        valArgs = valArgs.map(function(d) {return parseInt(d)})
+      }
+      this.knexQuery = this.knexQuery.whereIn(f, valArgs)
     } else if (valArgs.length > 0) {
       var queryDict = {}
       index.forEach(function(ind, i) {
@@ -356,6 +364,15 @@ rethinkQuery.prototype = {
       log('queryDict', queryDict)
       if (model.pk in queryDict) {
         this.pkVal = queryDict[model.pk]
+      }
+      for (var f in queryDict) {
+        if (model.fields[f].fieldType == 'integer') {
+          if (queryDict[f]) {
+            queryDict[f] = parseInt(queryDict[f])
+          } else if (queryDict[f] == '') {
+            queryDict[f] = null
+          }
+        }
       }
       this.knexQuery = this.knexQuery.where(queryDict)
     } else {
