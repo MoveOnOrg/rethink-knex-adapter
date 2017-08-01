@@ -326,7 +326,7 @@ rethinkQuery.prototype = {
       // MORETODO
       //then()
     } else if (func_or_dict) {
-      this._conformQuery(func_or_dict, model)
+      this._conformQuery(func_or_dict)
       this.knexQuery = this.knexQuery.where(func_or_dict)
     }
   },
