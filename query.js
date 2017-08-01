@@ -301,7 +301,7 @@ rethinkQuery.prototype = {
   _conformQuery: function(queryDict, model) {
     model = model || this.kninky.models[this.tableName]
     for (var f in queryDict) {
-      if (model.fields[f].fieldType == 'integer') {
+      if (model.fields[f] && model.fields[f].fieldType == 'integer') {
         if (queryDict[f]) {
           queryDict[f] = parseInt(queryDict[f])
         } else if (queryDict[f] == '') {
