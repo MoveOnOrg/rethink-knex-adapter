@@ -298,6 +298,20 @@ rethinkQuery.prototype = {
     )
   },
 
+  _conformQuery: function(queryDict, model) {
+    model = model || this.kninky.models[this.tableName]
+    for (var f in queryDict) {
+      if (model.fields[f].fieldType == 'integer') {
+        if (queryDict[f]) {
+          queryDict[f] = parseInt(queryDict[f])
+        } else if (queryDict[f] == '') {
+          queryDict[f] = null
+        }
+      }
+    }
+    return queryDict
+  },
+
   FILTER: function(func_or_dict) {
     // when a dict, it functions like a regular WHERE filter
     // when a function, it needs to filter post-query (sad?)
@@ -312,6 +326,7 @@ rethinkQuery.prototype = {
       // MORETODO
       //then()
     } else if (func_or_dict) {
+      this._conformQuery(func_or_dict, model)
       this.knexQuery = this.knexQuery.where(func_or_dict)
     }
   },
@@ -365,15 +380,7 @@ rethinkQuery.prototype = {
       if (model.pk in queryDict) {
         this.pkVal = queryDict[model.pk]
       }
-      for (var f in queryDict) {
-        if (model.fields[f].fieldType == 'integer') {
-          if (queryDict[f]) {
-            queryDict[f] = parseInt(queryDict[f])
-          } else if (queryDict[f] == '') {
-            queryDict[f] = null
-          }
-        }
-      }
+      this._conformQuery(queryDict, model)
       this.knexQuery = this.knexQuery.where(queryDict)
     } else {
       // nothing to get -- better get nothing or we
