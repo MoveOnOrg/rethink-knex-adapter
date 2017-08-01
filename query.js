@@ -27,9 +27,8 @@ for (var b in ProtoDef.Datum.DatumType) {
 }
 
 function log() {
-  console.log.apply(null, arguments)
   if (process.env.RETHINK_KNEX_DEBUG) {
-    // doesn't work :-(
+    console.log.apply(null, arguments)
   }
 }
 
@@ -122,7 +121,9 @@ rethinkQuery.prototype = {
 
     log('running then()')
     if (this.isChangesListener) {
-      //TODO: setup a ?local listener for save changes
+      if (this.goodChangeListener) {
+        model.changeListeners.push(func)
+      }
       log('UNIMPLEMENTED: CHANGES LISTENER')
     } else if (this.knexQuery) {
       log('KNEX QUERY', this.knexQuery._method)
@@ -169,9 +170,18 @@ rethinkQuery.prototype = {
           log('knex result mapped', x[0])
         }
         if (self.brackets.length) {
-          //MORETODO?: brackets need to be laced with the right parts
-          // and then maybe iterated through
-          x = x[self.brackets.pop()]
+          var b;
+          while (b = self.brackets.pop()) {
+            if (typeof b == 'string') {
+              // this is a key so, e.g. pluck('foo')('foo') => ['fooValue1', 'fooValue2', ...]
+              x = x.map(function(d) {
+                return d[b]
+              })
+            } else if (typeof b == 'number') {
+              // this is an index so e.g. pluck('foo')(0) => [{'foo': 'fooValue1'}]
+              x = x[b]
+            }
+          }
         }
         if (!x && self.defaultVal) {
           x = self.defaultVal
@@ -216,12 +226,6 @@ rethinkQuery.prototype = {
         columns.push(selectTable + '.' + sField)
       }
       this.knexQuery = this.knexQuery.select(columns)
-    } else if (this.currentPluck == index) {
-      // do nothing: this is knex's default behavior:
-      //  pluck('foo') => ['foo_value1', 'foo_value2'...]
-      // whereas rethinkdb defaults to
-      //  pluck('foo') => [{'foo': 'foo_value1'}, {'foo': foo_value2'},...]
-      // but r.pluck('foo')('foo') is so common, we'll just ASSUME it
     } else {
       this.brackets.push(index)
     }
@@ -229,6 +233,9 @@ rethinkQuery.prototype = {
 
   CHANGES: function() {
     this.isChangesListener = true
+    // We have a different API than rethinkdb,
+    // so track obvious mis-uses
+    this.goodChangeListener = true
   },
 
   COUNT: function() {
@@ -296,6 +303,10 @@ rethinkQuery.prototype = {
       //need to process the function as byte-code-ish stuff
       var funccode = this.flattenQuery(func_or_dict, true)
       log('FUNCCODE', JSON.stringify(funccode))
+      if (this.isChangesListener) {
+        this.goodChangeListener = false
+        error('changes() in rethink-knex-adapter has a different API.  Please see documentation')
+      }
       // MORETODO
       //then()
     } else if (func_or_dict) {
@@ -320,7 +331,8 @@ rethinkQuery.prototype = {
     var notValArgs = ((lastArg && lastArg.index) ? 1 : 0)
     // all but the last arg, if it's the index thingie:
     var valArgs = Array.prototype.slice.call(arguments, 0, arguments.length - notValArgs);
-    if (lastArg.index
+    if (lastArg
+        && lastArg.index
         && lastArg.index != model.pk
         && lastArg.index in model.indexes
        ) {
@@ -345,8 +357,11 @@ rethinkQuery.prototype = {
         this.pkVal = queryDict[model.pk]
       }
       this.knexQuery = this.knexQuery.where(queryDict)
+    } else {
+      // nothing to get -- better get nothing or we
+      // might be running .delete() on 'all' instead of 'none'
+      this.knexQuery = this.knexQuery.where(model.pk, -997)
     }
-
   },
 
   GROUP: function() {
@@ -424,15 +439,16 @@ rethinkQuery.prototype = {
     }
   },
 
-  PLUCK: function(fieldName) {
+  PLUCK: function(fieldNames) {
+    // confusingly, knex:pluck() does what's called 'bracket' in rethinkdb
+    // fieldNames can be an array of columns or just a single column name (most common)
     if (this.knexQuery) {
-      this.knexQuery = this.knexQuery.pluck(fieldName)
+      this.knexQuery = this.knexQuery.select(fieldNames)
     }
-    this.currentPluck = fieldName // for bracket, it's redundant
   },
 
   SUM: function() {
-
+    error('UNIMPLEMENTED SUM ')
   },
 
   TABLE: function(tableName) {

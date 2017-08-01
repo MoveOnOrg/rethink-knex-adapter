@@ -1,4 +1,4 @@
-//MORETODO: allow var x = new Model(objData); x.save()
+var Promise = require('bluebird');
 
 function Document(model, options, exists) {
   this._model = model.__proto__
@@ -24,6 +24,7 @@ function dbModel(tableName, fields, options, kninky) {
   this.dateFields = []
   this.indexes = {}
   this.pk = 'id'
+  this.changeListeners = []
   this.justCreatedTables = false
   // for supporting introspection
   this._schema = {
@@ -113,6 +114,7 @@ dbModel.prototype = {
             }
             console.log('SAVE SUCCESS', newData)
             newData.__proto__ = new Document(self, self._options, true)
+            self._callChangeListeners(newData, null)
             return newData
           })
       }
@@ -156,6 +158,7 @@ dbModel.prototype = {
         console.log('SAVE UPDATE', newData)
         newData.__proto__ = new Document(self, self._options, true)
         newData.replaced = 1
+        self._callChangeListeners(newData, serverData || self)
         return newData
       })
   },
@@ -176,6 +179,13 @@ dbModel.prototype = {
       }
     }
     return objData
+  },
+  _callChangeListeners: function(newObjData, oldObjData) {
+    for (var i=0,l=this.changeListeners.length; i<l; i++) {
+      Promise.resolve({new_val: newObjData,
+                       old_val: oldObjData})
+        .then(this.changeListeners[i])
+    }
   }
 }
 
