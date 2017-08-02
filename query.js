@@ -123,8 +123,9 @@ rethinkQuery.prototype = {
     if (this.isChangesListener) {
       if (this.goodChangeListener) {
         model.changeListeners.push(func)
+      } else {
+        log('UNIMPLEMENTED: CHANGES LISTENER')
       }
-      log('UNIMPLEMENTED: CHANGES LISTENER')
     } else if (this.knexQuery) {
       log('KNEX QUERY', this.knexQuery._method)
       if (self.currentJoin && !self.currentJoin.select) {
@@ -253,6 +254,9 @@ rethinkQuery.prototype = {
 
   DELETE: function() {
     if (this.knexQuery) {
+      if (this.emptyMatch) {
+        this.knexQuery = this.knexQuery.where(model.pk, -997)
+      }
       this.knexQuery = this.knexQuery.delete()
     }
   },
@@ -297,6 +301,20 @@ rethinkQuery.prototype = {
     )
   },
 
+  _conformQuery: function(queryDict, model) {
+    model = model || this.kninky.models[this.tableName]
+    for (var f in queryDict) {
+      if (model.fields[f] && model.fields[f].fieldType == 'integer') {
+        if (queryDict[f]) {
+          queryDict[f] = parseInt(queryDict[f])
+        } else if (queryDict[f] == '') {
+          queryDict[f] = null
+        }
+      }
+    }
+    return queryDict
+  },
+
   FILTER: function(func_or_dict) {
     // when a dict, it functions like a regular WHERE filter
     // when a function, it needs to filter post-query (sad?)
@@ -311,12 +329,16 @@ rethinkQuery.prototype = {
       // MORETODO
       //then()
     } else if (func_or_dict) {
+      this._conformQuery(func_or_dict)
       this.knexQuery = this.knexQuery.where(func_or_dict)
     }
   },
 
   GET: function(pk_val) {  // returns single result
     var model = this.kninky.models[this.tableName]
+    if (pk_val && model.fields[model.pk].fieldType == 'integer') {
+      pk_val = parseInt(pk_val)
+    }
     this.pkVal = pk_val
     this.returnSingleObject = true
     this.knexQuery = this.knexQuery.where(model.pk, pk_val)
@@ -342,7 +364,11 @@ rethinkQuery.prototype = {
 
     if (valArgs.length > 1) {
       // do whereIn here
-      this.knexQuery = this.knexQuery.whereIn(index[0], valArgs)
+      var f = index[0]
+      if (model.fields[f].fieldType == 'integer') {
+        valArgs = valArgs.map(function(d) {return parseInt(d)})
+      }
+      this.knexQuery = this.knexQuery.whereIn(f, valArgs)
     } else if (valArgs.length > 0) {
       var queryDict = {}
       index.forEach(function(ind, i) {
@@ -357,11 +383,12 @@ rethinkQuery.prototype = {
       if (model.pk in queryDict) {
         this.pkVal = queryDict[model.pk]
       }
+      this._conformQuery(queryDict, model)
       this.knexQuery = this.knexQuery.where(queryDict)
-    } else {
-      // nothing to get -- better get nothing or we
+    } else if (lastArg && lastArg.index && valArgs.length == 0) {
+      // nothing to get
       // might be running .delete() on 'all' instead of 'none'
-      this.knexQuery = this.knexQuery.where(model.pk, -997)
+      this.emptyMatch = true
     }
   },
 
@@ -481,6 +508,9 @@ rethinkQuery.prototype = {
       }
     }
     log('UPDATING', copyData)
+    if (this.emptyMatch) {
+      this.knexQuery = this.knexQuery.where(model.pk, -997)
+    }
     this.knexQuery = this.knexQuery.update(copyData)
   },
 
