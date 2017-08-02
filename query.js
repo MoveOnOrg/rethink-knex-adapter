@@ -128,9 +128,15 @@ rethinkQuery.prototype = {
       }
     } else if (this.knexQuery) {
       log('KNEX QUERY', this.knexQuery._method)
-      if (self.currentJoin && !self.currentJoin.select) {
-        // we need to structure the output as {'left': {...}, 'right': {....}}
-        // so we need to make the fields distinguishable to separate them later
+      // Test for eqJoin behavior where we need to
+      // structure the output as {'left': {...}, 'right': {....}}
+      // so we make the fields distinguishable to separate them later.
+      // Also confirm knexQuery is a knex 'Builder' rather than a
+      // returned promise/result (e.g. when COUNT() is run)
+      var doLeftRightJoinRefactor = (self.currentJoin
+                                     && !self.currentJoin.select
+                                     && this.knexQuery.client)
+      if (doLeftRightJoinRefactor) {
         var columns = []
         var lTable = self.currentJoin.left
         var rTable = self.currentJoin.right
@@ -152,7 +158,7 @@ rethinkQuery.prototype = {
       return this.knexQuery.then(function(x) {
         //TODO: need to ?sometimes? turn knex results into model objects
         log('knex result', x, self.brackets)
-        if (self.currentJoin && !self.currentJoin.select) {
+        if (doLeftRightJoinRefactor) {
           x = x.map(function(res) {
             var newObj = {'left':{}, 'right': {}}
             for (var k in res) {
@@ -185,7 +191,7 @@ rethinkQuery.prototype = {
             }
           }
         }
-        if (!x && self.defaultVal) {
+        if (!x && self.hasOwnProperty('defaultVal')) {
           x = self.defaultVal
         }
         if (Array.isArray(x)) {
@@ -255,6 +261,7 @@ rethinkQuery.prototype = {
   DELETE: function() {
     if (this.knexQuery) {
       if (this.emptyMatch) {
+        var model = this.kninky.models[this.tableName]
         this.knexQuery = this.knexQuery.where(model.pk, -997)
       }
       this.knexQuery = this.knexQuery.delete()
@@ -341,7 +348,7 @@ rethinkQuery.prototype = {
     }
     this.pkVal = pk_val
     this.returnSingleObject = true
-    this.knexQuery = this.knexQuery.where(model.pk, pk_val)
+    this.knexQuery = this.knexQuery.where(this.tableName + '.' + model.pk, pk_val)
   },
 
   GET_ALL: function() {
@@ -357,9 +364,12 @@ rethinkQuery.prototype = {
     if (lastArg
         && lastArg.index
         && lastArg.index != model.pk
-        && lastArg.index in model.indexes
        ) {
-      index = model.indexes[lastArg.index]
+      if (lastArg.index in model.indexes) {
+        index = model.indexes[lastArg.index]
+      } else {
+        index = [lastArg.index]
+      }
     }
 
     if (valArgs.length > 1) {

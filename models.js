@@ -303,7 +303,7 @@ modelType.prototype = {
       }
     } else {
       kField = table[this.fieldType](fieldName)
-      if (this.defaultVal) {
+      if (this.hasOwnProperty('defaultVal')) {
         kField = kField.defaultTo(this.defaultVal)
       } else if (this.timestamp && this.timestamp == 'now') {
         kField = kField.defaultTo(knex.fn.now())
