@@ -85,7 +85,7 @@ dbModel.prototype = {
     // mostly NOT DONE. options only has {conflict: 'update'} possibility
     var self = this
     if (Array.isArray(objData)) {
-      objData = objData.map(self._prepSaveFields.bind(this))
+      objData = objData.map(this._prepSaveFields.bind(this))
       log('SAVE BATCH', objData.length, objData[0], options)
       return this.kninky.k.batchInsert(this.tableName, objData, 100).then(
         function(d) {
@@ -173,9 +173,19 @@ dbModel.prototype = {
       })
   },
   _prepSaveFields: function(objData) {
+    // also used to prep query dictionaries in query.js
     if (objData.replaced && !this.fields.replaced) {
       delete objData.replaced
       delete objData.__proto__.replaced
+    }
+    for (var f in objData) {
+      if (this.fields[f] && this.fields[f].fieldType == 'integer') {
+        if (objData[f]) {
+          objData[f] = parseInt(objData[f])
+        } else if (objData[f] == '') {
+          objData[f] = null
+        }
+      }
     }
     return objData
   },
