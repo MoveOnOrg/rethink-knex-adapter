@@ -249,7 +249,8 @@ rethinkQuery.prototype = {
   COUNT: function() {
     if (this.knexQuery) {
       this.knexQuery = this.knexQuery.count().then(function(countResult) {
-        return Number(countResult[0]['count(*)'])
+        // try sqlite and then try postgres version
+        return Number(countResult[0]['count(*)'] || countResult[0]['count'])
       })
     }
   },

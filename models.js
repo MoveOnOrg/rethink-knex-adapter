@@ -1,5 +1,12 @@
 var Promise = require('bluebird');
 
+
+function log() {
+  if (process.env.RETHINK_KNEX_DEBUG) {
+    console.log.apply(null, arguments)
+  }
+}
+
 function Document(model, options, exists) {
   this._model = model.__proto__
   this._exists = exists || false
@@ -11,7 +18,7 @@ Document.prototype.save = function(callback) {
   if (this._exists || this[this._model.pk]) {
     options['conflict'] = 'update'
   }
-  console.log('RUNNING document.save()')
+  log('RUNNING document.save()')
   var res = this._model.save(this, options)
   return (callback ? res.then(callback) : res.then())
 }
@@ -58,6 +65,7 @@ dbModel.prototype = {
       fields.push(indexName)
     }
     this.indexes[indexName] = fields;
+    //TODO: this isn't working.  and tries every time
     if (this.justCreatedTables) {
       this.kninky.k.table(tableName).index(fields)
     }
@@ -78,7 +86,7 @@ dbModel.prototype = {
     var self = this
     if (Array.isArray(objData)) {
       objData = objData.map(self._prepSaveFields.bind(this))
-      console.log('SAVE BATCH', objData.length, objData[0], options)
+      log('SAVE BATCH', objData.length, objData[0], options)
       return this.kninky.k.batchInsert(this.tableName, objData, 100).then(
         function(d) {
           //batchInsert returns an array of create counts (or ids?)
@@ -90,7 +98,7 @@ dbModel.prototype = {
           console.error('BATCH INSERT ERROR', err)
         })
     } else {
-      console.log('SAVE', objData, options)
+      log('SAVE', objData, options)
       this._prepSaveFields(objData)
       this._prepSaveFields(this)
       var insertFunc = function() {
@@ -103,16 +111,18 @@ dbModel.prototype = {
               objData[a] = f.defaultVal
             }
           }
-          console.log('SAVE w/defaults', objData)
+          log('SAVE w/defaults', objData)
         }
-        return self.kninky.k.insert(objData).into(self.tableName)
+        return self.kninky.k.insert(objData, [self.pk]).into(self.tableName)
           .then(function(ids) {
-            //TODO: This needs to be a whole (magical) model thingy WITH fields
+            log('POST SAVE ARGS', ids)
             var newData = Object.assign({}, objData)
-            if (self.pk == 'id') {
-              newData.id = ids[0]
+            if (ids.length && self.pk == 'id') {
+              // postgres return [{id:123}] whereas everyone
+              // else returns [123] (wtf?!)
+              newData.id = ids[0][self.pk] || ids[0]
             }
-            console.log('SAVE SUCCESS', newData)
+            log('SAVE SUCCESS', newData)
             newData.__proto__ = new Document(self, self._options, true)
             self._callChangeListeners(newData, null)
             return newData
@@ -155,7 +165,7 @@ dbModel.prototype = {
     return this.kninky.k.table(this.tableName).where(q)
       .update(objData, this.pk).then(function(res) {
         var newData = Object.assign({}, serverData, objData)
-        console.log('SAVE UPDATE', newData)
+        log('SAVE UPDATE', newData)
         newData.__proto__ = new Document(self, self._options, true)
         newData.replaced = 1
         self._callChangeListeners(newData, serverData || self)
