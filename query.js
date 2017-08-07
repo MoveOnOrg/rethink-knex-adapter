@@ -200,7 +200,7 @@ rethinkQuery.prototype = {
             return model._updateDateFields(res)
           })
         }
-        if (x && self.pkVal) {
+        if (x && (self.pkVal || self.returnSingleObject)) {
             if (self.knexQuery._method == 'update') {
               // needs to do a new select to get all the data back
               return self.kninky.k.from(self.tableName)
