@@ -65,10 +65,11 @@ dbModel.prototype = {
       fields.push(indexName)
     }
     this.indexes[indexName] = fields;
-    //TODO: this isn't working.  and tries every time
-    if (this.justCreatedTables) {
-      this.kninky.k.table(tableName).index(fields)
-    }
+    this.doesTableExist.then(function(tableExists) {
+      if (!tableExists) {
+        this.kninky.k.table(tableName).index(fields)
+      }
+    })
   },
   filter: function(data) {
     return this.kninky.r.table(this.tableName).filter(data)
@@ -306,34 +307,47 @@ modelType.prototype = {
     this.noReference = true
     return this
   },
-  toKnex: function(table, fieldName, knex) {
-    var kField;
+  prepWithFieldName: function(fieldName) {
+    this.fieldName = fieldName
+    // additional work to prep foreignReferences
     if ((fieldName.endsWith('_id') || this.foreignReference) && !this.noReference) {
       // need to morph reference fields into integers
       if (!this.foreignReference) {
         this.foreignReference = fieldName.split('_id')[0]
       }
       this.fieldType = 'integer'
-      kField = table[this.fieldType](fieldName).references('id').inTable(this.foreignReference)
       if (this.nullable || this.defaultVal == '') {
         //stupid rethink pattern of foreign keys being allowNull(false).default('')
-        kField = kField.nullable()
         this.nullable = true
         this.defaultVal = null
       }
-    } else {
-      kField = table[this.fieldType](fieldName)
+    }
+  },
+  toKnex: function(table, fieldName, knex) {
+    var kField;
+    this.prepWithFieldName(fieldName)
+    if (table) {
+      if (this.foreignReference && !this.noReference) {
+        kField = table[this.fieldType](fieldName).references('id').inTable(this.foreignReference)
+      } else {
+        kField = table[this.fieldType](fieldName)
+        if (this.timestamp && this.timestamp == 'now') {
+          kField = kField.defaultTo(knex.fn.now())
+        }
+      }
+
       if (this.hasOwnProperty('defaultVal')) {
         kField = kField.defaultTo(this.defaultVal)
-      } else if (this.timestamp && this.timestamp == 'now') {
-        kField = kField.defaultTo(knex.fn.now())
       }
-    }
 
-    if (!this.nullable) {
-      kField = kField.notNullable()
+      if (this.nullable) {
+        kField = kField.nullable()
+      } else {
+        kField = kField.notNullable()
+      }
+
+      return kField
     }
-    return kField
   }
 }
 
