@@ -14,13 +14,20 @@ function Document(model, options, exists) {
 
 Document.prototype.save = function(callback) {
   //saving an actual document that has possibly been modified
+  var self = this
   var options = {}
   if (this._exists || this[this._model.pk]) {
     options['conflict'] = 'update'
   }
   log('RUNNING document.save()')
   var res = this._model.save(this, options)
-  return (callback ? res.then(callback) : res.then())
+  var updateSavedObj = function(newData) {
+    if (newData && newData.id) {
+      self.id = newData.id
+    }
+    return newData
+  }
+  return (callback ? res.then(updateSavedObj).then(callback) : res.then(updateSavedObj))
 }
 
 function dbModel(tableName, fields, options, kninky) {
@@ -178,6 +185,10 @@ dbModel.prototype = {
     if (objData.replaced && !this.fields.replaced) {
       delete objData.replaced
       delete objData.__proto__.replaced
+    }
+    if (objData._exists && !this.fields._exists) {
+      delete objData._exists
+      delete objData.__proto__._exists
     }
     for (var f in objData) {
       if (this.fields[f] && this.fields[f].fieldType == 'integer') {
