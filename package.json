@@ -1,6 +1,6 @@
 {
   "name": "rethink-knex-adapter",
-  "version": "0.3.8",
+  "version": "0.3.9",
   "description": "Knex adapter for rethinkdb/thinky APIs to convert a project with less effort",
   "repository": {
     "type": "git",

@@ -194,7 +194,7 @@ dbModel.prototype = {
       if (this.fields[f] && this.fields[f].fieldType == 'integer') {
         if (objData[f]) {
           objData[f] = parseInt(objData[f])
-        } else if (objData[f] == '') {
+        } else if (objData[f] === '') {
           objData[f] = null
         }
       }
