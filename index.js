@@ -1,3 +1,5 @@
+var Promise = require('bluebird');
+
 var rethinkQuery = require('./query')
 var models = require('./models')
 
@@ -41,9 +43,7 @@ dumbThinky.prototype = {
     model.pk = (pkDict && pkDict.pk) || 'id'
 
     // get a promise that will allow us to test if we have to create it and index it
-    model.doesTableExist = this.k.schema.hasTable(tableName)
-
-    model.doesTableExist.then(
+    this.k.schema.hasTable(tableName).then(
       function(tableExists) {
         if (!tableExists) {
           // unintuitively, this function runs even if the table DOES exist
@@ -68,7 +68,10 @@ dumbThinky.prototype = {
                 kField = kField.primary()
               }
             }
-            model.justCreatedTable = true
+            model.tableDidNotExist = true
+            for (var key in model.tableDoesNotExistListeners) {
+              Promise.resolve(model).then(model.tableDoesNotExistListeners[key])
+            }
             return model
           }).catch(function(err) {
             console.error('failed to create ', tableName, err)
