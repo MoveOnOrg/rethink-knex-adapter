@@ -1,6 +1,6 @@
 {
   "name": "rethink-knex-adapter",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Knex adapter for rethinkdb/thinky APIs to convert a project with less effort",
   "repository": {
     "type": "git",
@@ -13,6 +13,10 @@
     "rethinkdb"
   ],
   "author": "Sky Duveen",
+  "maintainers": {
+    "name": "MoveOn.org Tech Team",
+    "email": "opensource@moveon.org"
+  },
   "license": "MIT",
   "bugs": {
     "url": "https://github.com/MoveOnOrg/rethink-knex-adapter/issues"
