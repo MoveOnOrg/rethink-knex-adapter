@@ -39,7 +39,8 @@ function dbModel(tableName, fields, options, kninky) {
   this.indexes = {}
   this.pk = 'id'
   this.changeListeners = []
-  this.justCreatedTables = false
+  this.tableDidNotExist = false
+  this.tableDoesNotExistListeners = {}
   // for supporting introspection
   this._schema = {
     _schema: this.fields,
@@ -62,6 +63,18 @@ dbModel.new = function(name, fields, options, kninky) {
 }
 
 dbModel.prototype = {
+  _ifTableDoesNotExist: function(key, func) {
+    if (this.tableDidNotExist
+        && !(key in this.tableDoesNotExistListeners)) {
+      // case where we must have already run and completed the test
+      // but we also check to make sure the same key-func wasn't already run
+      Promise.resolve(this).then(func)
+    } else {
+      // either before the test was run OR after it was run and we learned it existed
+      // in the second case, adding it does no harm
+      this.tableDoesNotExistListeners[key] = func
+    }
+  },
   ensureIndex: function(indexName, indexFunc) {
     var fields = [];
     if (indexFunc) {
@@ -72,10 +85,8 @@ dbModel.prototype = {
       fields.push(indexName)
     }
     this.indexes[indexName] = fields;
-    this.doesTableExist.then(function(tableExists) {
-      if (!tableExists) {
-        this.kninky.k.table(tableName).index(fields)
-      }
+    this._ifTableDoesNotExist(indexName, function(self) {
+      self.kninky.k.table(self.tableName).index(fields)
     })
   },
   filter: function(data) {
