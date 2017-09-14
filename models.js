@@ -86,7 +86,7 @@ dbModel.prototype = {
     }
     this.indexes[indexName] = fields;
     this._ifTableDoesNotExist(indexName, function(self) {
-      self.kninky.k.table(tableName).index(fields)
+      self.kninky.k.table(self.tableName).index(fields)
     })
   },
   filter: function(data) {
