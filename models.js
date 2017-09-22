@@ -85,9 +85,14 @@ dbModel.prototype = {
       fields.push(indexName)
     }
     this.indexes[indexName] = fields;
-    this._ifTableDoesNotExist(indexName, function(self) {
+    var createIndex = function(self) {
       self.kninky.k.table(self.tableName).index(fields)
-    })
+    }
+    if (process.env.RETHINK_KNEX_FORCE_INDEXCREATION) {
+      createIndex(this)
+    } else {
+      this._ifTableDoesNotExist(indexName, createIndex)
+    }
   },
   filter: function(data) {
     return this.kninky.r.table(this.tableName).filter(data)
