@@ -86,8 +86,9 @@ dbModel.prototype = {
     }
     this.indexes[indexName] = fields;
     var createIndex = function(self) {
-      self.kninky.k.schema.table(self.tableName, function(table) {
+      self.kninky.k.schema.alterTable(self.tableName, function(table) {
         table.index(fields)
+      }).then(function() {
         log('index "' + indexName + '"created for ' + self.tableName)
       })
     }
