@@ -86,9 +86,10 @@ dbModel.prototype = {
     }
     this.indexes[indexName] = fields;
     var createIndex = function(self) {
-      self.kninky.k.table(self.tableName).index(fields).then(function() {
+      self.kninky.k.schema.table(self.tableName, function(table) {
+        table.index(fields)
         log('index "' + indexName + '"created for ' + self.tableName)
-      }, log)
+      })
     }
     if (process.env.RETHINK_KNEX_FORCE_INDEXCREATION) {
       createIndex(this)
