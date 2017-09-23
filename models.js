@@ -88,10 +88,13 @@ dbModel.prototype = {
     var createIndex = function(self) {
       self.kninky.k.schema.alterTable(self.tableName, function(table) {
         table.index(fields)
-      }).then(function() {
+      }).then(function passed() {
         log('index "' + indexName + '"created for ' + self.tableName)
+      }, function rejected(err) {
+        log('failed indexing', err)
       })
     }
+
     if (process.env.RETHINK_KNEX_FORCE_INDEXCREATION) {
       createIndex(this)
     } else {
