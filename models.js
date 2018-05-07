@@ -361,7 +361,7 @@ modelType.prototype = {
     var kField;
     this.prepWithFieldName(fieldName)
     if (table) {
-      if (this.foreignReference && !this.noReference) {
+      if (this.foreignReference && !this.noReference && !process.env.RETHINK_KNEX_NOREFS) {
         kField = table[this.fieldType](fieldName).references('id').inTable(this.foreignReference)
       } else {
         kField = table[this.fieldType](fieldName)
