@@ -114,12 +114,20 @@ dbModel.prototype = {
   },
   save: function(objData, options) {
     // MORETODO: returns a promise at the moment
-    // mostly NOT DONE. options only has {conflict: 'update'} possibility
+    // mostly NOT DONE.
+    // options (optional):
+    //   - conflict: 'update' (only choice)
+    //   - transaction: knex transaction object
     var self = this
     if (Array.isArray(objData)) {
       objData = objData.map(this._prepSaveFields.bind(this))
       log('SAVE BATCH', objData.length, objData[0], options)
-      return this.kninky.k.batchInsert(this.tableName, objData, 100).then(
+      var queryBase = this.kninky.k.batchInsert(this.tableName, objData, 100)
+      if (options && options.transaction) {
+        var trx = options.transaction
+        queryBase = queryBase.transacting(trx)
+      }
+      return queryBase.then(
         function(d) {
           //batchInsert returns an array of create counts (or ids?)
           // like [100, 200, 300, ....]
@@ -145,7 +153,12 @@ dbModel.prototype = {
           }
           log('SAVE w/defaults', objData)
         }
-        return self.kninky.k.insert(objData, [self.pk]).into(self.tableName)
+        var queryBase = self.kninky.k.insert(objData, [self.pk]).into(self.tableName)
+        if (options && options.transaction) {
+          var trx = options.transaction
+          queryBase = queryBase.transacting(trx)
+        }
+        return queryBase
           .then(function(ids) {
             log('POST SAVE ARGS', ids)
             var newData = Object.assign({}, objData)
@@ -168,10 +181,17 @@ dbModel.prototype = {
         } else {
           Object.assign(q, objData)
         }
-        return this.kninky.k.table(this.tableName).where(q)
-          .select().then(function(serverData) {
+
+        var queryBase = this.kninky.k.table(this.tableName).where(q).select()
+        if (options && options.transaction) {
+          var trx = options.transaction
+          queryBase = queryBase.transacting(trx)
+        }
+        return queryBase
+          .then(function(serverData) {
             if (serverData.length) {
-              return self.update(objData, serverData[0], q)
+              var options = trx ? { transaction: trx } : {}
+              return self.update(objData, serverData[0], q, options)
             } else {
               return insertFunc()
             }
@@ -181,7 +201,9 @@ dbModel.prototype = {
       }
     }
   },
-  update: function(objData, serverData, q) {
+  update: function(objData, serverData, q, options) {
+    // options (optional):
+    //   - transaction: knex transaction object
     var self = this
     this._prepSaveFields(objData)
     this._prepSaveFields(this)
@@ -194,8 +216,14 @@ dbModel.prototype = {
         throw new Error("cannot update unsaved value")
       }
     }
-    return this.kninky.k.table(this.tableName).where(q)
-      .update(objData, this.pk).then(function(res) {
+    var queryBase = this.kninky.k.table(this.tableName).where(q)
+      .update(objData, this.pk)
+    if (options && options.transaction) {
+      var trx = options.transaction
+      queryBase = queryBase.transacting(trx)
+    }
+    return queryBase
+      .then(function(res) {
         var newData = Object.assign({}, serverData, objData)
         log('SAVE UPDATE', newData)
         newData.__proto__ = new Document(self, self._options, true)
