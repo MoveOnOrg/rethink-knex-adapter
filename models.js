@@ -41,6 +41,7 @@ function dbModel(tableName, fields, options, kninky) {
   this.changeListeners = []
   this.tableDidNotExist = false
   this.tableDoesNotExistListeners = {}
+  this.timestamps = false
   // for supporting introspection
   this._schema = {
     _schema: this.fields,
