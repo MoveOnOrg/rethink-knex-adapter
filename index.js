@@ -60,37 +60,40 @@ dumbThinky.prototype = {
   createTable: function(tableName, deferPostCreation) {
     var self = this
     var model = this.models[tableName]
-    var fields = model.fields
+    return model.createTable(function() {
+      if (!deferPostCreation) {
+        self.postTableCreation(model.tableName)
+      }
+    })
+  },
+  createTables: function(tableNames) {
+    // list of tables to be created synchronously and in order
+    var self = this
     return new Promise(function(resolve, reject) {
-      var pp = self.k.schema.createTableIfNotExists(tableName, function (table) {
-        if ('id' in fields && fields['id'].fieldType == 'string') {
-          table.uuid('id') // FUTURE: the uuid would need to come client-side for this to work
-        } else if (model.pk === 'id') {
-          table.increments(); //default 'id' field
+      var curProm = null
+      for (var i=0,l=tableNames.length; i<l; i++) {
+        var model = self.models[tableNames[i]]
+        var createTable = function() {
+          return model.createTable()
         }
-        if (model.timestamps) {
-          table.timestamps();
+        if (!curProm) {
+          curProm = createTable()
+        } else {
+          curProm = curProm.then(function() {
+            return createTable()
+          }, reject)
         }
-        for (var fieldName in fields) {
-          if (fieldName === 'id') {
-            continue // addressed above
+      }
+      if (curProm) {
+        curProm.then(function() {
+          for (var i=0,l=tableNames.length; i<l; i++) {
+            var model = self.models[tableNames[i]]
+            model.createIndexes()
           }
-          var kninkyField = fields[fieldName]
-          var kField = kninkyField.toKnex(table, fieldName, self.k)
-          // is primary key?
-          if (model.pk == fieldName) {
-            kField = kField.primary()
-          }
-        }
-        model.tableDidNotExist = true
-        if (!deferPostCreation) {
-          self.postTableCreation(model.tableName)
-        }
-        return tableName
-      }).catch(function(err) {
-        console.error('failed to create ', tableName, err)
-      });
-      return pp.then(resolve, reject)
+          // don't wait for indexes to be created
+          resolve(self)
+        }, reject)
+      }
     })
   },
   createTableMaybe: function(tableName) {
@@ -124,9 +127,11 @@ dumbThinky.prototype = {
     model.dateFields = dateFields
     model.pk = (pkDict && pkDict.pk) || 'id'
     model.timestamps = (pkDict && pkDict.timestamps)
+    model.noAutoCreation = (process.env.RETHINK_KNEX_NOAUTOCREATE || (pkDict && pkDict.noAutoCreation))
+
     this.models[tableName] = model
 
-    if (!process.env.RETHINK_KNEX_NOAUTOCREATE && (!pkDict || !pkDict.noAutoCreation)) {
+    if (!model.noAutoCreation) {
       this.createTableMaybe(tableName)
     }
 
