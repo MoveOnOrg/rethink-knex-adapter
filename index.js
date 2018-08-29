@@ -29,9 +29,20 @@ dumbThinky.prototype = {
         return self.createTable(tableNameList[i])
       }
     }
+    var nextIndex = function(j) {
+      return function(xxx) {
+        var model = self.models[tableNameList[j]]
+        return model.createIndexes()
+      }
+    }
     var p = self.createTable(tableNameList[0])
+    // models
     for (var i=1,l=tableNameList.length; i<l; i++) {
       p = p.then(nextTable(i))
+    }
+    // indexes
+    for (var j=0,l=tableNameList.length; j<l; j++) {
+      p = p.then(nextIndex(j))
     }
     return p
   },
@@ -63,36 +74,6 @@ dumbThinky.prototype = {
     return model.createTable(function() {
       if (!deferPostCreation) {
         self.postTableCreation(model.tableName)
-      }
-    })
-  },
-  createTables: function(tableNames) {
-    // list of tables to be created synchronously and in order
-    var self = this
-    return new Promise(function(resolve, reject) {
-      var curProm = null
-      for (var i=0,l=tableNames.length; i<l; i++) {
-        var model = self.models[tableNames[i]]
-        var createTable = function() {
-          return model.createTable()
-        }
-        if (!curProm) {
-          curProm = createTable()
-        } else {
-          curProm = curProm.then(function() {
-            return createTable()
-          }, reject)
-        }
-      }
-      if (curProm) {
-        curProm.then(function() {
-          for (var i=0,l=tableNames.length; i<l; i++) {
-            var model = self.models[tableNames[i]]
-            model.createIndexes()
-          }
-          // don't wait for indexes to be created
-          resolve(self)
-        }, reject)
       }
     })
   },
@@ -130,7 +111,6 @@ dumbThinky.prototype = {
     model.noAutoCreation = (process.env.RETHINK_KNEX_NOAUTOCREATE || (pkDict && pkDict.noAutoCreation))
 
     this.models[tableName] = model
-
     if (!model.noAutoCreation) {
       this.createTableMaybe(tableName)
     }
