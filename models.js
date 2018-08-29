@@ -76,6 +76,57 @@ dbModel.prototype = {
       this.tableDoesNotExistListeners[key] = func
     }
   },
+  createTable: function(postCreationFunction) {
+    var self = this
+    var model = this
+    var fields = model.fields
+    var tableName = this.tableName
+    return new Promise(function(resolve, reject) {
+      var pp = self.kninky.k.schema.createTableIfNotExists(tableName, function (table) {
+        if ('id' in fields && fields['id'].fieldType == 'string') {
+          table.uuid('id') // FUTURE: the uuid would need to come client-side for this to work
+        } else if (model.pk === 'id') {
+          table.increments(); //default 'id' field
+        }
+        if (model.timestamps) {
+          table.timestamps();
+        }
+        for (var fieldName in fields) {
+          if (fieldName === 'id') {
+            continue // addressed above
+          }
+          var kninkyField = fields[fieldName]
+          var kField = kninkyField.toKnex(table, fieldName, self.kninky.k)
+          // is primary key?
+          if (model.pk == fieldName) {
+            kField = kField.primary()
+          }
+        }
+        model.tableDidNotExist = true
+        if (postCreationFunction) {
+          postCreationFunction(tableName)
+        }
+        return tableName
+      }).catch(function(err) {
+        console.error('failed to create ', tableName, err)
+      });
+      return pp.then(resolve, reject)
+    })
+  },
+  createIndex: function(indexName) {
+    return this.kninky.k.schema.alterTable(this.tableName, function(table) {
+      table.index(fields)
+    }).then(function passed() {
+      log('index "' + indexName + '"created for ' + this.tableName)
+    }, function rejected(err) {
+      log('failed indexing', err)
+    })
+  },
+  createIndexes: function() {
+    for (var indexName in this.indexes) {
+      this.createIndex(indexName)
+    }
+  },
   ensureIndex: function(indexName, indexFunc) {
     var fields = [];
     if (indexFunc) {
@@ -87,18 +138,12 @@ dbModel.prototype = {
     }
     this.indexes[indexName] = fields;
     var createIndex = function(self) {
-      self.kninky.k.schema.alterTable(self.tableName, function(table) {
-        table.index(fields)
-      }).then(function passed() {
-        log('index "' + indexName + '"created for ' + self.tableName)
-      }, function rejected(err) {
-        log('failed indexing', err)
-      })
+      self.createIndex(indexName)
     }
 
     if (process.env.RETHINK_KNEX_FORCE_INDEXCREATION) {
       createIndex(this)
-    } else {
+    } else if (!this.noAutoCreation) {
       this._ifTableDoesNotExist(indexName, createIndex)
     }
   },

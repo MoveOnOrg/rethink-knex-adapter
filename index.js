@@ -29,9 +29,20 @@ dumbThinky.prototype = {
         return self.createTable(tableNameList[i])
       }
     }
+    var nextIndex = function(j) {
+      return function(xxx) {
+        var model = self.models[tableNameList[j]]
+        return model.createIndexes()
+      }
+    }
     var p = self.createTable(tableNameList[0])
+    // models
     for (var i=1,l=tableNameList.length; i<l; i++) {
       p = p.then(nextTable(i))
+    }
+    // indexes
+    for (var j=0,l=tableNameList.length; j<l; j++) {
+      p = p.then(nextIndex(j))
     }
     return p
   },
@@ -60,37 +71,10 @@ dumbThinky.prototype = {
   createTable: function(tableName, deferPostCreation) {
     var self = this
     var model = this.models[tableName]
-    var fields = model.fields
-    return new Promise(function(resolve, reject) {
-      var pp = self.k.schema.createTableIfNotExists(tableName, function (table) {
-        if ('id' in fields && fields['id'].fieldType == 'string') {
-          table.uuid('id') // FUTURE: the uuid would need to come client-side for this to work
-        } else if (model.pk === 'id') {
-          table.increments(); //default 'id' field
-        }
-        if (model.timestamps) {
-          table.timestamps();
-        }
-        for (var fieldName in fields) {
-          if (fieldName === 'id') {
-            continue // addressed above
-          }
-          var kninkyField = fields[fieldName]
-          var kField = kninkyField.toKnex(table, fieldName, self.k)
-          // is primary key?
-          if (model.pk == fieldName) {
-            kField = kField.primary()
-          }
-        }
-        model.tableDidNotExist = true
-        if (!deferPostCreation) {
-          self.postTableCreation(model.tableName)
-        }
-        return tableName
-      }).catch(function(err) {
-        console.error('failed to create ', tableName, err)
-      });
-      return pp.then(resolve, reject)
+    return model.createTable(function() {
+      if (!deferPostCreation) {
+        self.postTableCreation(model.tableName)
+      }
     })
   },
   createTableMaybe: function(tableName) {
@@ -124,9 +108,10 @@ dumbThinky.prototype = {
     model.dateFields = dateFields
     model.pk = (pkDict && pkDict.pk) || 'id'
     model.timestamps = (pkDict && pkDict.timestamps)
-    this.models[tableName] = model
+    model.noAutoCreation = (process.env.RETHINK_KNEX_NOAUTOCREATE || (pkDict && pkDict.noAutoCreation))
 
-    if (!process.env.RETHINK_KNEX_NOAUTOCREATE && (!pkDict || !pkDict.noAutoCreation)) {
+    this.models[tableName] = model
+    if (!model.noAutoCreation) {
       this.createTableMaybe(tableName)
     }
 
