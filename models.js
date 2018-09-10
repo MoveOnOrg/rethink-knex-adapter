@@ -289,9 +289,9 @@ dbModel.prototype = {
     }
     for (var f in objData) {
       if (this.fields[f] && this.fields[f].fieldType == 'integer') {
-        if (objData[f]) {
+        if (objData[f] || objData[f] === 0) {
           objData[f] = parseInt(objData[f])
-        } else if (objData[f] === '') {
+        } else {
           objData[f] = null
         }
       }
