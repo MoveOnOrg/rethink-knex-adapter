@@ -186,19 +186,25 @@ dbModel.prototype = {
       log('SAVE', objData, options)
       this._prepSaveFields(objData)
       this._prepSaveFields(this)
+      var dataToSave = {}
+      for (var f in self.fields) {
+        if (f in objData) {
+          dataToSave[f] = objData[f]
+        }
+      }
       var insertFunc = function() {
         // only set defaults on insert -- not on update
         if (self.kninky.defaultsUnsupported) {
           for (var a in self.fields) {
             var f = self.fields[a]
-            if (typeof objData[a] == 'undefined'
+            if (typeof dataToSave[a] == 'undefined'
                 && typeof f.defaultVal != 'undefined') {
-              objData[a] = f.defaultVal
+              dataToSave[a] = f.defaultVal
             }
           }
-          log('SAVE w/defaults', objData)
+          log('SAVE w/defaults', dataToSave)
         }
-        var queryBase = self.kninky.k.insert(objData, [self.pk]).into(self.tableName)
+        var queryBase = self.kninky.k.insert(dataToSave, [self.pk]).into(self.tableName)
         if (options && options.transaction) {
           var trx = options.transaction
           queryBase = queryBase.transacting(trx)
@@ -221,10 +227,10 @@ dbModel.prototype = {
 
       if (options && options.conflict == 'update') {
         var q = {}
-        if (objData[this.pk]) {
-          q[this.pk] = objData[this.pk]
+        if (dataToSave[this.pk]) {
+          q[this.pk] = dataToSave[this.pk]
         } else {
-          Object.assign(q, objData)
+          Object.assign(q, dataToSave)
         }
 
         var queryBase = this.kninky.k.table(this.tableName).where(q).select()
@@ -236,7 +242,7 @@ dbModel.prototype = {
           .then(function(serverData) {
             if (serverData.length) {
               var options = trx ? { transaction: trx } : {}
-              return self.update(objData, serverData[0], q, options)
+              return self.update(dataToSave, serverData[0], q, options)
             } else {
               return insertFunc()
             }
