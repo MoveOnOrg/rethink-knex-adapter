@@ -167,7 +167,8 @@ dbModel.prototype = {
     if (Array.isArray(objData)) {
       objData = objData.map(this._prepSaveFields.bind(this))
       log('SAVE BATCH', objData.length, objData[0], options)
-      var queryBase = this.kninky.k.batchInsert(this.tableName, objData, 100)
+      var batchSize = (options.size ? options.size : 100)
+      var queryBase = this.kninky.k.batchInsert(this.tableName, objData, batchSize)
       if (options && options.transaction) {
         var trx = options.transaction
         queryBase = queryBase.transacting(trx)
