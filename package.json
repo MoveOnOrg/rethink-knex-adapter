@@ -22,7 +22,7 @@
     "url": "https://github.com/MoveOnOrg/rethink-knex-adapter/issues"
   },
   "dependencies": {
-    "bluebird": "~2.10.2",
+    "bluebird": "~3.5.5",
     "knex": "^0.15.2",
     "rethinkdbdash": "~2.3.0",
     "thinky": "^2.3.3"
