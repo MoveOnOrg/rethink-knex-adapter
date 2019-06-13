@@ -82,35 +82,42 @@ dbModel.prototype = {
     var fields = model.fields
     var tableName = this.tableName
     return new Promise(function(resolve, reject) {
-      var pp = self.kninky.k.schema.createTableIfNotExists(tableName, function (table) {
-        if ('id' in fields && fields['id'].fieldType == 'string') {
-          table.uuid('id') // FUTURE: the uuid would need to come client-side for this to work
-        } else if (model.pk === 'id') {
-          table.increments(); //default 'id' field
+      self.kninky.k.schema.hasTable(tableName).then(function(exists) {
+        if (exists) {
+          model.tableDidNotExist = false
+          resolve(tableName)
+        } else {
+          var pp = self.kninky.k.schema.createTable(tableName, function (table) {
+            if ('id' in fields && fields['id'].fieldType == 'string') {
+              table.uuid('id') // FUTURE: the uuid would need to come client-side for this to work
+            } else if (model.pk === 'id') {
+              table.increments(); //default 'id' field
+            }
+            if (model.timestamps) {
+              table.timestamps();
+            }
+            for (var fieldName in fields) {
+              if (fieldName === 'id') {
+                continue // addressed above
+              }
+              var kninkyField = fields[fieldName]
+              var kField = kninkyField.toKnex(table, fieldName, self.kninky.k)
+              // is primary key?
+              if (model.pk == fieldName) {
+                kField = kField.primary()
+              }
+            }
+            model.tableDidNotExist = true
+            if (postCreationFunction) {
+              postCreationFunction(tableName)
+            }
+            return tableName
+          }).catch(function(err) {
+            console.error('failed to create ', tableName, err)
+          });
+          return pp.then(resolve, reject)
         }
-        if (model.timestamps) {
-          table.timestamps();
-        }
-        for (var fieldName in fields) {
-          if (fieldName === 'id') {
-            continue // addressed above
-          }
-          var kninkyField = fields[fieldName]
-          var kField = kninkyField.toKnex(table, fieldName, self.kninky.k)
-          // is primary key?
-          if (model.pk == fieldName) {
-            kField = kField.primary()
-          }
-        }
-        model.tableDidNotExist = true
-        if (postCreationFunction) {
-          postCreationFunction(tableName)
-        }
-        return tableName
-      }).catch(function(err) {
-        console.error('failed to create ', tableName, err)
-      });
-      return pp.then(resolve, reject)
+      })
     })
   },
   createIndex: function(indexName) {
