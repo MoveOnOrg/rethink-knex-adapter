@@ -1,6 +1,6 @@
 {
   "name": "rethink-knex-adapter",
-  "version": "0.4.17",
+  "version": "0.4.18",
   "description": "Knex adapter for rethinkdb/thinky APIs to convert a project with less effort",
   "repository": {
     "type": "git",
@@ -23,7 +23,7 @@
   },
   "dependencies": {
     "bluebird": "~2.10.2",
-    "knex": "^0.15.2",
+    "knex": "^0.17.5",
     "rethinkdbdash": "~2.3.0",
     "thinky": "^2.3.3"
   }
