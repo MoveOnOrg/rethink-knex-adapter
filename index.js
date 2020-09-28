@@ -119,6 +119,6 @@ dumbThinky.prototype = {
   }
 }
 
-module.exports = function(knexConfig) {
-  return new dumbThinky(knexConfig);
+module.exports = function(knexConfig, knexConn) {
+  return new dumbThinky(knexConfig, knexConn);
 }
