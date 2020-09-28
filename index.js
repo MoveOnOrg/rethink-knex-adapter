@@ -6,10 +6,10 @@ var models = require('./models')
 //import rethinkQuery from './query'
 //import {modelType} from './models'
 
-function dumbThinky(knexConfig) {
+function dumbThinky(knexConfig, knexConn) {
   // for 'direct' access to knex
   this.config = knexConfig
-  this.k = require('knex')(knexConfig)
+  this.k = knexConn || require('knex')(knexConfig)
   this.defaultsUnsupported = knexConfig.defaultsUnsupported
 
   // implementation of (some of) thinky/rethinkdb driver interfaces
